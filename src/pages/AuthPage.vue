@@ -9,7 +9,7 @@
           {{ isSignUp ? 'Create your account' : 'Sign in to your account' }}
         </h2>
         <p class="mt-2 text-sm text-neutral-600">
-          {{ isSignUp ? 'Start monitoring your health today' : 'Welcome back to HealthMonitor' }}
+          {{ isSignUp ? 'Start monitoring your health today' : 'Welcome back to Aivital' }}
         </p>
       </div>
 
@@ -97,7 +97,7 @@
             </div>
             <div class="relative flex justify-center text-sm">
               <span class="px-2 bg-white text-neutral-500">
-                {{ isSignUp ? 'Already have an account?' : 'New to HealthMonitor?' }}
+                {{ isSignUp ? 'Already have an account?' : 'New to Aivital?' }}
               </span>
             </div>
           </div>

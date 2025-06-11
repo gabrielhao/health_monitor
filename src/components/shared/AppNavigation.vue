@@ -7,7 +7,7 @@
           <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <HeartIcon class="w-5 h-5 text-white" />
           </div>
-          <span class="text-xl font-semibold text-neutral-900">HealthMonitor</span>
+          <span class="text-xl font-semibold text-neutral-900">Aivital</span>
         </div>
         <button @click="toggleNavigation" class="lg:hidden p-1 rounded-md hover:bg-neutral-100">
           <XMarkIcon class="w-5 h-5" />

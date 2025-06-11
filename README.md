@@ -1,4 +1,4 @@
-# HealthMonitor - Comprehensive Health Tracking Application
+# Aivital - Comprehensive Health Tracking Application
 
 A modern, full-stack health monitoring application built with Vue 3, TypeScript, and Supabase. Track your health metrics, chat with an AI assistant, and gain insights through comprehensive analytics.
 
@@ -50,7 +50,7 @@ A modern, full-stack health monitoring application built with Vue 3, TypeScript,
 
 ```bash
 git clone <repository-url>
-cd health-monitoring-app
+cd aivital
 ```
 
 ### 2. Install Dependencies
