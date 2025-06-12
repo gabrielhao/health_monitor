@@ -220,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted, watch, h, type Component } from 'vue'
 import { useHealthStore } from '@/stores/health'
 import { format } from 'date-fns'
 import {
@@ -276,8 +276,11 @@ const filteredMetrics = computed(() => {
   return healthStore.metrics.filter(metric => metric.metric_type === selectedType.value)
 })
 
-const getMetricIcon = (type: MetricType) => {
-  const icons = {
+// Create a fallback component to ensure we never return null
+const FallbackIcon = () => h('div', { class: 'w-5 h-5 bg-gray-300 rounded' })
+
+const getMetricIcon = (type: MetricType): Component => {
+  const icons: Record<MetricType, Component> = {
     blood_pressure: HeartIcon,
     heart_rate: HeartIcon,
     weight: ScaleIcon,
@@ -290,8 +293,9 @@ const getMetricIcon = (type: MetricType) => {
     water_intake: BeakerIcon,
     mood_score: HeartIcon,
   }
-  // Ensure we always return a valid component, never null
-  return icons[type] || ClipboardDocumentListIcon || PlusIcon
+  
+  // Return the specific icon or fallback to ClipboardDocumentListIcon or ultimate fallback
+  return icons[type] || ClipboardDocumentListIcon || FallbackIcon
 }
 
 const formatMetricType = (type: MetricType): string => {
