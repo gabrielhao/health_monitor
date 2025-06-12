@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, readonly } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { HealthMetric, MetricType } from '@/types'
 import { useAuthStore } from './auth'

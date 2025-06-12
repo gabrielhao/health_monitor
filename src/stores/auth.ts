@@ -86,14 +86,15 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error(error.message)
       }
 
-      // Create profile if user was created
+      // Create profile immediately after user is created, regardless of session status
+      if (data.user) {
+        await createProfile(data.user.id, { email, ...userData })
+      }
+
+      // Check if email confirmation is required
       if (data.user && !data.session) {
         // Email confirmation required
         return { needsConfirmation: true }
-      }
-
-      if (data.user && userData) {
-        await createProfile(data.user.id, { email, ...userData })
       }
 
       return { needsConfirmation: false }

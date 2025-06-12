@@ -367,8 +367,8 @@ import {
   ExclamationCircleIcon,
   ClockIcon,
   XCircleIcon,
+  WatchIcon,
 } from '@heroicons/vue/24/outline'
-import { WatchIcon } from '@heroicons/vue/24/solid'
 import type { ImportSession } from '@/types/vector'
 
 const vectorStore = useVectorStore()
