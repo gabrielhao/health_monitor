@@ -56,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
         throw error
       }
 
+      // Set profile to data (which will be null if no profile found)
       profile.value = data
     } catch (error) {
       console.error('Error fetching profile:', error)

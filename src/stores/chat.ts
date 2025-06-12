@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, readonly } from 'vue'
 import { supabase } from '@/services/supabase'
 import type { ChatMessage } from '@/types'
 import { useAuthStore } from './auth'
