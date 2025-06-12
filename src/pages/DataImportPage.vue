@@ -81,7 +81,7 @@
                 or drag and drop
               </p>
               <p class="text-sm text-neutral-500">
-                Supports XML, JSON, CSV, ZIP files up to 50MB
+                Supports XML, JSON, CSV, ZIP files up to 5GB
               </p>
             </div>
             
@@ -449,11 +449,11 @@ const handleDrop = (event: DragEvent) => {
 }
 
 const validateFile = (file: File) => {
-  const maxSize = 50 * 1024 * 1024 // 50MB
+  const maxSize = 5 * 1024 * 1024 * 1024 // 5GB
   const allowedTypes = ['.xml', '.json', '.csv', '.zip']
   
   if (file.size > maxSize) {
-    uploadError.value = 'File size must be less than 50MB'
+    uploadError.value = 'File size must be less than 5GB'
     uploadForm.file = null
     return false
   }
