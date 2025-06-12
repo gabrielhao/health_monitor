@@ -50,9 +50,9 @@ export const useAuthStore = defineStore('auth', () => {
         .from('user_profiles')
         .select('*')
         .eq('id', user.value.id)
-        .single()
+        .maybeSingle()
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error
       }
 
