@@ -290,7 +290,8 @@ const getMetricIcon = (type: MetricType) => {
     water_intake: BeakerIcon,
     mood_score: HeartIcon,
   }
-  return icons[type] || ClipboardDocumentListIcon
+  // Ensure we always return a valid component, never null
+  return icons[type] || ClipboardDocumentListIcon || PlusIcon
 }
 
 const formatMetricType = (type: MetricType): string => {
