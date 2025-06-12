@@ -87,6 +87,7 @@ import {
   ArrowRightOnRectangleIcon,
   XMarkIcon,
   Bars3Icon,
+  CloudArrowUpIcon,
 } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
@@ -101,6 +102,7 @@ const navigationItems = [
   { name: 'Health', to: '/health', icon: ClipboardDocumentListIcon },
   { name: 'Chat', to: '/chat', icon: ChatBubbleLeftRightIcon },
   { name: 'Analytics', to: '/analytics', icon: ChartBarIcon },
+  { name: 'Import Data', to: '/import', icon: CloudArrowUpIcon },
   { name: 'Profile', to: '/profile', icon: Cog6ToothIcon },
 ]
 

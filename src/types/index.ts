@@ -91,3 +91,6 @@ export interface DashboardMetric {
   icon?: string
   color?: string
 }
+
+// Re-export vector types
+export * from './vector'
