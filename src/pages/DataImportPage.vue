@@ -60,7 +60,12 @@
             <label class="block text-sm font-medium text-neutral-700 mb-2">
               Upload File
             </label>
-            <div class="border-2 border-dashed border-neutral-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors duration-200">
+            <div 
+              @drop="handleDrop"
+              @dragover.prevent
+              @dragenter.prevent
+              class="border-2 border-dashed border-neutral-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors duration-200"
+            >
               <input
                 ref="fileInput"
                 type="file"
@@ -104,6 +109,10 @@
               class="input-field"
               placeholder="Add any notes about this import..."
             ></textarea>
+          </div>
+
+          <div v-if="uploadError" class="bg-error-50 border border-error-200 rounded-lg p-3">
+            <p class="text-sm text-error-700">{{ uploadError }}</p>
           </div>
 
           <button
@@ -157,6 +166,29 @@
       </div>
     </div>
 
+    <!-- Import Progress -->
+    <div v-if="currentImport" class="card mb-8">
+      <h2 class="text-xl font-semibold text-neutral-900 mb-4">Import Progress</h2>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-sm font-medium text-neutral-700">Processing {{ currentImport.source_app }} data...</span>
+          <span class="text-sm text-neutral-500">{{ currentImport.processed_records }} / {{ currentImport.total_records }}</span>
+        </div>
+        <div class="w-full bg-neutral-200 rounded-full h-2">
+          <div 
+            class="bg-primary-600 h-2 rounded-full transition-all duration-300"
+            :style="{ width: `${(currentImport.processed_records / currentImport.total_records) * 100}%` }"
+          ></div>
+        </div>
+        <div v-if="currentImport.status === 'completed'" class="text-sm text-success-600">
+          ✓ Import completed successfully
+        </div>
+        <div v-if="currentImport.status === 'failed'" class="text-sm text-error-600">
+          ✗ Import failed
+        </div>
+      </div>
+    </div>
+
     <!-- Import History -->
     <div class="card">
       <div class="flex items-center justify-between mb-6">
@@ -204,6 +236,9 @@
             <button v-if="session.error_log.length > 0" @click="showErrors(session)" class="text-sm text-error-600 hover:text-error-500">
               View Errors
             </button>
+            <button @click="viewImportDetails(session)" class="text-sm text-primary-600 hover:text-primary-500">
+              Details
+            </button>
           </div>
         </div>
       </div>
@@ -244,12 +279,82 @@
         </div>
       </div>
     </div>
+
+    <!-- Import Details Modal -->
+    <div v-if="detailsSession" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-lg max-w-4xl w-full p-6">
+        <h3 class="text-lg font-semibold text-neutral-900 mb-4">Import Details</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <h4 class="font-medium text-neutral-900 mb-2">Import Information</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Source:</span>
+                <span class="font-medium">{{ formatSourceName(detailsSession.source_app) }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Status:</span>
+                <span :class="`font-medium ${getStatusColor(detailsSession.status).text}`">{{ detailsSession.status }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Started:</span>
+                <span>{{ formatDate(detailsSession.started_at) }}</span>
+              </div>
+              <div v-if="detailsSession.completed_at" class="flex justify-between">
+                <span class="text-neutral-600">Completed:</span>
+                <span>{{ formatDate(detailsSession.completed_at) }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 class="font-medium text-neutral-900 mb-2">Processing Summary</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Total Records:</span>
+                <span class="font-medium">{{ detailsSession.total_records }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Processed:</span>
+                <span class="font-medium text-success-600">{{ detailsSession.processed_records }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Failed:</span>
+                <span class="font-medium text-error-600">{{ detailsSession.failed_records }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-neutral-600">Success Rate:</span>
+                <span class="font-medium">{{ Math.round((detailsSession.processed_records / detailsSession.total_records) * 100) }}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="detailsSession.metadata && Object.keys(detailsSession.metadata).length > 0" class="mb-6">
+          <h4 class="font-medium text-neutral-900 mb-2">Metadata</h4>
+          <div class="bg-neutral-50 rounded-lg p-3">
+            <pre class="text-sm text-neutral-700">{{ JSON.stringify(detailsSession.metadata, null, 2) }}</pre>
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+          <button @click="viewImportedDocuments(detailsSession)" class="btn-outline">
+            View Imported Data
+          </button>
+          <button @click="detailsSession = null" class="btn-primary">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useVectorStore } from '@/stores/vector'
+import { useRouter } from 'vue-router'
 import { format } from 'date-fns'
 import {
   CloudArrowUpIcon,
@@ -267,10 +372,14 @@ import { WatchIcon } from '@heroicons/vue/24/solid'
 import type { ImportSession } from '@/types/vector'
 
 const vectorStore = useVectorStore()
+const router = useRouter()
 
 const showSampleData = ref(false)
 const selectedSession = ref<ImportSession | null>(null)
+const detailsSession = ref<ImportSession | null>(null)
+const currentImport = ref<ImportSession | null>(null)
 const fileInput = ref<HTMLInputElement>()
+const uploadError = ref('')
 
 const uploadForm = reactive({
   source: '',
@@ -325,59 +434,272 @@ const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
     uploadForm.file = target.files[0]
+    uploadError.value = ''
+    validateFile(target.files[0])
   }
+}
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault()
+  const files = event.dataTransfer?.files
+  if (files && files[0]) {
+    uploadForm.file = files[0]
+    uploadError.value = ''
+    validateFile(files[0])
+  }
+}
+
+const validateFile = (file: File) => {
+  const maxSize = 50 * 1024 * 1024 // 50MB
+  const allowedTypes = ['.xml', '.json', '.csv', '.zip']
+  
+  if (file.size > maxSize) {
+    uploadError.value = 'File size must be less than 50MB'
+    uploadForm.file = null
+    return false
+  }
+  
+  const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+  if (!allowedTypes.includes(fileExtension)) {
+    uploadError.value = 'File type not supported. Please upload XML, JSON, CSV, or ZIP files.'
+    uploadForm.file = null
+    return false
+  }
+  
+  return true
 }
 
 const handleUpload = async () => {
   if (!uploadForm.source || !uploadForm.file) return
 
+  uploadError.value = ''
+
   try {
-    // For demo purposes, we'll create sample data based on file type
-    const sampleData = generateSampleDataFromFile(uploadForm.file, uploadForm.source)
+    // Read file content
+    const fileContent = await readFileContent(uploadForm.file)
     
-    await vectorStore.importHealthData({
+    // Parse data based on file type and source
+    const parsedData = await parseFileData(fileContent, uploadForm.file, uploadForm.source)
+    
+    if (!parsedData || parsedData.length === 0) {
+      uploadError.value = 'No valid health data found in the file'
+      return
+    }
+
+    const importSession = await vectorStore.importHealthData({
       source: uploadForm.source,
-      data: sampleData,
+      data: parsedData,
       metadata: {
         filename: uploadForm.file.name,
         filesize: uploadForm.file.size,
-        notes: uploadForm.notes
+        filetype: uploadForm.file.type,
+        notes: uploadForm.notes,
+        uploaded_at: new Date().toISOString()
       }
     })
+
+    currentImport.value = importSession
 
     // Reset form
     uploadForm.source = ''
     uploadForm.file = null
     uploadForm.notes = ''
     
-  } catch (error) {
+    // Refresh import sessions
+    await vectorStore.fetchImportSessions()
+    
+  } catch (error: any) {
     console.error('Upload failed:', error)
+    uploadError.value = error.message || 'Upload failed. Please try again.'
   }
+}
+
+const readFileContent = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => resolve(e.target?.result as string)
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsText(file)
+  })
+}
+
+const parseFileData = async (content: string, file: File, source: string) => {
+  const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
+  
+  try {
+    switch (fileExtension) {
+      case '.json':
+        return parseJSONData(content, source)
+      case '.csv':
+        return parseCSVData(content, source)
+      case '.xml':
+        return parseXMLData(content, source)
+      default:
+        throw new Error('Unsupported file format')
+    }
+  } catch (error) {
+    throw new Error(`Failed to parse ${fileExtension} file: ${error}`)
+  }
+}
+
+const parseJSONData = (content: string, source: string) => {
+  const data = JSON.parse(content)
+  
+  if (Array.isArray(data)) {
+    return data
+  } else if (data.data && Array.isArray(data.data)) {
+    return data.data
+  } else {
+    return [data]
+  }
+}
+
+const parseCSVData = (content: string, source: string) => {
+  const lines = content.split('\n').filter(line => line.trim())
+  if (lines.length < 2) throw new Error('CSV file must have at least a header and one data row')
+  
+  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
+  const data = []
+  
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+    const row: any = {}
+    
+    headers.forEach((header, index) => {
+      row[header] = values[index] || ''
+    })
+    
+    data.push(row)
+  }
+  
+  return data
+}
+
+const parseXMLData = (content: string, source: string) => {
+  // Simple XML parsing for Apple Health exports
+  if (source === 'apple_health') {
+    return parseAppleHealthXML(content)
+  }
+  
+  // For other XML formats, convert to JSON-like structure
+  const parser = new DOMParser()
+  const xmlDoc = parser.parseFromString(content, 'text/xml')
+  
+  if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+    throw new Error('Invalid XML format')
+  }
+  
+  return extractXMLData(xmlDoc)
+}
+
+const parseAppleHealthXML = (content: string) => {
+  const parser = new DOMParser()
+  const xmlDoc = parser.parseFromString(content, 'text/xml')
+  
+  if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+    throw new Error('Invalid Apple Health XML format')
+  }
+  
+  const records = xmlDoc.getElementsByTagName('Record')
+  const data = []
+  
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i]
+    const type = record.getAttribute('type') || ''
+    const value = record.getAttribute('value') || ''
+    const unit = record.getAttribute('unit') || ''
+    const startDate = record.getAttribute('startDate') || ''
+    const endDate = record.getAttribute('endDate') || ''
+    const sourceName = record.getAttribute('sourceName') || ''
+    const sourceVersion = record.getAttribute('sourceVersion') || ''
+    const device = record.getAttribute('device') || ''
+    
+    data.push({
+      type,
+      value: isNaN(Number(value)) ? value : Number(value),
+      unit,
+      startDate,
+      endDate,
+      sourceName,
+      sourceVersion,
+      device
+    })
+  }
+  
+  return data
+}
+
+const extractXMLData = (xmlDoc: Document) => {
+  // Generic XML to object conversion
+  const data: any[] = []
+  const rootElement = xmlDoc.documentElement
+  
+  const extractElement = (element: Element): any => {
+    const obj: any = {}
+    
+    // Add attributes
+    for (let i = 0; i < element.attributes.length; i++) {
+      const attr = element.attributes[i]
+      obj[attr.name] = attr.value
+    }
+    
+    // Add child elements
+    for (let i = 0; i < element.children.length; i++) {
+      const child = element.children[i]
+      const childData = extractElement(child)
+      
+      if (obj[child.tagName]) {
+        if (!Array.isArray(obj[child.tagName])) {
+          obj[child.tagName] = [obj[child.tagName]]
+        }
+        obj[child.tagName].push(childData)
+      } else {
+        obj[child.tagName] = childData
+      }
+    }
+    
+    // Add text content if no children
+    if (element.children.length === 0 && element.textContent?.trim()) {
+      return element.textContent.trim()
+    }
+    
+    return obj
+  }
+  
+  if (rootElement.children.length > 0) {
+    for (let i = 0; i < rootElement.children.length; i++) {
+      data.push(extractElement(rootElement.children[i]))
+    }
+  } else {
+    data.push(extractElement(rootElement))
+  }
+  
+  return data
 }
 
 const importSampleData = async () => {
   try {
     const sampleData = generateSampleAppleHealthData()
     
-    await vectorStore.importHealthData({
+    const importSession = await vectorStore.importHealthData({
       source: 'apple_health',
       data: sampleData,
       metadata: {
         type: 'sample_data',
-        generated_at: new Date().toISOString()
+        generated_at: new Date().toISOString(),
+        description: 'Sample Apple Health data for demonstration'
       }
     })
     
+    currentImport.value = importSession
     showSampleData.value = false
+    
+    // Refresh import sessions
+    await vectorStore.fetchImportSessions()
   } catch (error) {
     console.error('Sample data import failed:', error)
+    uploadError.value = 'Failed to import sample data'
   }
-}
-
-const generateSampleDataFromFile = (file: File, source: string) => {
-  // In a real implementation, you would parse the actual file
-  // For demo purposes, generate sample data
-  return generateSampleAppleHealthData()
 }
 
 const generateSampleAppleHealthData = () => {
@@ -402,7 +724,7 @@ const generateSampleAppleHealthData = () => {
     // Step count
     data.push({
       type: 'HKQuantityTypeIdentifierStepCount',
-      value: 8000 + Math.random() * 4000,
+      value: Math.floor(8000 + Math.random() * 4000),
       unit: 'count',
       startDate: date.toISOString(),
       endDate: date.toISOString(),
@@ -414,12 +736,30 @@ const generateSampleAppleHealthData = () => {
     if (i % 7 === 0) {
       data.push({
         type: 'HKQuantityTypeIdentifierBodyMass',
-        value: 70 + Math.random() * 2 - 1,
+        value: Math.round((70 + Math.random() * 2 - 1) * 10) / 10,
         unit: 'kg',
         startDate: date.toISOString(),
         endDate: date.toISOString(),
         sourceName: 'Health App',
         device: 'iPhone'
+      })
+    }
+    
+    // Sleep data
+    if (Math.random() > 0.3) {
+      const sleepStart = new Date(date)
+      sleepStart.setHours(22, 30, 0, 0)
+      const sleepEnd = new Date(sleepStart)
+      sleepEnd.setHours(sleepEnd.getHours() + 7 + Math.random() * 2)
+      
+      data.push({
+        type: 'HKCategoryTypeIdentifierSleepAnalysis',
+        value: 'HKCategoryValueSleepAnalysisAsleep',
+        unit: '',
+        startDate: sleepStart.toISOString(),
+        endDate: sleepEnd.toISOString(),
+        sourceName: 'Apple Watch',
+        device: 'Apple Watch Series 8'
       })
     }
   }
@@ -430,6 +770,8 @@ const generateSampleAppleHealthData = () => {
 const connectSource = (source: any) => {
   // In a real implementation, this would handle OAuth or API connections
   console.log('Connecting to', source.name)
+  // For demo purposes, show a message
+  alert(`Connecting to ${source.name} would require OAuth integration in a real implementation.`)
 }
 
 const getSourceStatus = (sourceId: string) => {
@@ -500,6 +842,33 @@ const formatDate = (dateString: string) => {
 const showErrors = (session: ImportSession) => {
   selectedSession.value = session
 }
+
+const viewImportDetails = (session: ImportSession) => {
+  detailsSession.value = session
+}
+
+const viewImportedDocuments = (session: ImportSession) => {
+  detailsSession.value = null
+  // Navigate to health documents filtered by this import session
+  router.push(`/health?import=${session.id}`)
+}
+
+// Watch for import progress updates
+watch(() => vectorStore.importSessions, (sessions) => {
+  if (currentImport.value) {
+    const updated = sessions.find(s => s.id === currentImport.value?.id)
+    if (updated) {
+      currentImport.value = updated
+      
+      // Clear current import when completed or failed
+      if (updated.status === 'completed' || updated.status === 'failed') {
+        setTimeout(() => {
+          currentImport.value = null
+        }, 3000)
+      }
+    }
+  }
+}, { deep: true })
 
 onMounted(async () => {
   await Promise.all([
