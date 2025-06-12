@@ -123,7 +123,7 @@
           </div>
 
           <!-- Processing Options for Large Files -->
-          <div v-if="uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024" class="space-y-3">
+          <div v-if="uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024 && !isXMLFile(uploadForm.file)" class="space-y-3">
             <div class="border border-warning-200 rounded-lg p-4 bg-warning-50">
               <h4 class="font-medium text-warning-900 mb-2">Large File Processing Options</h4>
               <div class="space-y-2">
@@ -151,6 +151,15 @@
                 </label>
               </div>
             </div>
+          </div>
+
+          <!-- XML File Notice -->
+          <div v-if="uploadForm.file && isXMLFile(uploadForm.file) && uploadForm.file.size > 100 * 1024 * 1024" class="border border-blue-200 rounded-lg p-4 bg-blue-50">
+            <h4 class="font-medium text-blue-900 mb-2">XML File Processing</h4>
+            <p class="text-sm text-blue-800">
+              XML files require complete structure parsing and will be processed using full load mode regardless of size.
+              Large XML files may take longer to process but will maintain data integrity.
+            </p>
           </div>
 
           <!-- Error Display -->
@@ -512,6 +521,10 @@ const supportedSources = [
   }
 ]
 
+const isXMLFile = (file: File): boolean => {
+  return file.name.toLowerCase().endsWith('.xml')
+}
+
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
@@ -559,9 +572,11 @@ const validateFile = (file: File) => {
     return false
   }
   
-  // Set default processing mode based on file size
-  if (file.size > 100 * 1024 * 1024) {
+  // Set default processing mode based on file size and type
+  if (file.size > 100 * 1024 * 1024 && !isXMLFile(file)) {
     uploadForm.processingMode = 'streaming'
+  } else {
+    uploadForm.processingMode = 'full'
   }
   
   return true
@@ -603,8 +618,11 @@ const handleUpload = async () => {
   try {
     updateProgress('Preparing file...', 10, 'Validating file format and size')
 
-    // For large files, use streaming approach
-    if (uploadForm.file.size > 100 * 1024 * 1024 && uploadForm.processingMode === 'streaming') {
+    // Always use standard upload for XML files to maintain structure integrity
+    // For non-XML large files, use streaming approach if selected
+    if (uploadForm.file.size > 100 * 1024 * 1024 && 
+        uploadForm.processingMode === 'streaming' && 
+        !isXMLFile(uploadForm.file)) {
       await handleLargeFileUpload()
     } else {
       await handleStandardUpload()
@@ -646,7 +664,7 @@ const handleStandardUpload = async () => {
       filesize: uploadForm.file.size,
       filetype: uploadForm.file.type,
       notes: uploadForm.notes,
-      processing_mode: 'standard',
+      processing_mode: isXMLFile(uploadForm.file) ? 'full_xml' : 'standard',
       uploaded_at: new Date().toISOString()
     }
   })
@@ -687,31 +705,14 @@ const handleLargeFileUpload = async () => {
 
       const chunkContent = await readFileContent(chunk)
       
-      // For XML files, we need special handling to avoid breaking XML structure
-      if (uploadForm.file.name.toLowerCase().endsWith('.xml')) {
-        if (i === 0) {
-          // First chunk - parse what we can
-          const chunkData = await parseXMLChunk(chunkContent, true)
-          allData.push(...chunkData)
-        } else if (i === totalChunks - 1) {
-          // Last chunk
-          const chunkData = await parseXMLChunk(chunkContent, false, true)
-          allData.push(...chunkData)
-        } else {
-          // Middle chunks - extract records
-          const chunkData = await parseXMLChunk(chunkContent, false, false)
+      // For JSON/CSV, try to parse each chunk
+      try {
+        const chunkData = await parseFileData(chunkContent, chunk, uploadForm.source)
+        if (chunkData && chunkData.length > 0) {
           allData.push(...chunkData)
         }
-      } else {
-        // For JSON/CSV, try to parse each chunk
-        try {
-          const chunkData = await parseFileData(chunkContent, chunk, uploadForm.source)
-          if (chunkData && chunkData.length > 0) {
-            allData.push(...chunkData)
-          }
-        } catch (error) {
-          console.warn(`Failed to parse chunk ${i + 1}:`, error)
-        }
+      } catch (error) {
+        console.warn(`Failed to parse chunk ${i + 1}:`, error)
       }
 
       processedChunks++
@@ -749,52 +750,6 @@ const handleLargeFileUpload = async () => {
 
   } catch (error) {
     throw new Error(`Large file processing failed: ${error}`)
-  }
-}
-
-const parseXMLChunk = async (content: string, isFirst: boolean, isLast: boolean = false): Promise<any[]> => {
-  try {
-    // For Apple Health XML, look for Record elements
-    const recordMatches = content.match(/<Record[^>]*>.*?<\/Record>/g)
-    if (!recordMatches) return []
-
-    const data = []
-    for (const recordXML of recordMatches) {
-      try {
-        const parser = new DOMParser()
-        const xmlDoc = parser.parseFromString(`<root>${recordXML}</root>`, 'text/xml')
-        const record = xmlDoc.getElementsByTagName('Record')[0]
-        
-        if (record) {
-          const type = record.getAttribute('type') || ''
-          const value = record.getAttribute('value') || ''
-          const unit = record.getAttribute('unit') || ''
-          const startDate = record.getAttribute('startDate') || ''
-          const endDate = record.getAttribute('endDate') || ''
-          const sourceName = record.getAttribute('sourceName') || ''
-          const sourceVersion = record.getAttribute('sourceVersion') || ''
-          const device = record.getAttribute('device') || ''
-          
-          data.push({
-            type,
-            value: isNaN(Number(value)) ? value : Number(value),
-            unit,
-            startDate,
-            endDate,
-            sourceName,
-            sourceVersion,
-            device
-          })
-        }
-      } catch (error) {
-        console.warn('Failed to parse individual record:', error)
-      }
-    }
-
-    return data
-  } catch (error) {
-    console.warn('Failed to parse XML chunk:', error)
-    return []
   }
 }
 
