@@ -72,7 +72,19 @@ export const useAuthStore = defineStore('auth', () => {
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        // Provide more specific error messages for sign up
+        if (error.message.includes('already registered')) {
+          throw new Error('An account with this email already exists. Please sign in instead.')
+        }
+        if (error.message.includes('password')) {
+          throw new Error('Password must be at least 6 characters long.')
+        }
+        if (error.message.includes('email')) {
+          throw new Error('Please enter a valid email address.')
+        }
+        throw new Error(error.message)
+      }
 
       // Create profile if user was created
       if (data.user && !data.session) {
@@ -85,7 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       return { needsConfirmation: false }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing up:', error)
       throw error
     } finally {
@@ -103,13 +115,25 @@ export const useAuthStore = defineStore('auth', () => {
         password,
       })
 
-      if (error) throw error
+      if (error) {
+        // Provide more helpful error messages for sign in
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('The email or password you entered is incorrect. Please check your credentials and try again.')
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please check your email and click the confirmation link before signing in.')
+        }
+        if (error.message.includes('Too many requests')) {
+          throw new Error('Too many sign-in attempts. Please wait a few minutes before trying again.')
+        }
+        throw new Error(error.message)
+      }
 
       user.value = data.user as User
       await fetchProfile()
       
       return data
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing in:', error)
       throw error
     } finally {
@@ -189,8 +213,13 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email)
       
-      if (error) throw error
-    } catch (error) {
+      if (error) {
+        if (error.message.includes('email')) {
+          throw new Error('Please enter a valid email address.')
+        }
+        throw new Error(error.message)
+      }
+    } catch (error: any) {
       console.error('Error resetting password:', error)
       throw error
     }

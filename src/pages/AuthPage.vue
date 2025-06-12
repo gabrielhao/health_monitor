@@ -72,12 +72,39 @@
             />
           </div>
 
-          <div v-if="error" class="bg-error-50 border border-error-200 rounded-lg p-3">
-            <p class="text-sm text-error-700">{{ error }}</p>
+          <div v-if="error" class="bg-error-50 border border-error-200 rounded-lg p-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-error-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-error-700">{{ error }}</p>
+                <div v-if="showSignUpSuggestion" class="mt-2">
+                  <button
+                    type="button"
+                    @click="switchToSignUp"
+                    class="text-sm text-primary-600 hover:text-primary-500 underline"
+                  >
+                    Don't have an account? Create one here
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div v-if="successMessage" class="bg-success-50 border border-success-200 rounded-lg p-3">
-            <p class="text-sm text-success-700">{{ successMessage }}</p>
+          <div v-if="successMessage" class="bg-success-50 border border-success-200 rounded-lg p-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-success-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <p class="text-sm text-success-700">{{ successMessage }}</p>
+              </div>
+            </div>
           </div>
 
           <button
@@ -139,11 +166,17 @@
               placeholder="Enter your email"
             />
           </div>
+          <div v-if="resetError" class="mb-4 bg-error-50 border border-error-200 rounded-lg p-3">
+            <p class="text-sm text-error-700">{{ resetError }}</p>
+          </div>
+          <div v-if="resetSuccess" class="mb-4 bg-success-50 border border-success-200 rounded-lg p-3">
+            <p class="text-sm text-success-700">{{ resetSuccess }}</p>
+          </div>
           <div class="flex space-x-3">
             <button type="submit" :disabled="loading" class="btn-primary flex-1">
               Send Reset Link
             </button>
-            <button type="button" @click="showResetPassword = false" class="btn-outline flex-1">
+            <button type="button" @click="closeResetModal" class="btn-outline flex-1">
               Cancel
             </button>
           </div>
@@ -154,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { HeartIcon } from '@heroicons/vue/24/outline'
@@ -168,12 +201,19 @@ const error = ref('')
 const successMessage = ref('')
 const showResetPassword = ref(false)
 const resetEmail = ref('')
+const resetError = ref('')
+const resetSuccess = ref('')
 
 const form = reactive({
   fullName: '',
   email: '',
   password: '',
   confirmPassword: ''
+})
+
+// Show suggestion to sign up if user tries to sign in with non-existent credentials
+const showSignUpSuggestion = computed(() => {
+  return !isSignUp.value && error.value.includes('email or password you entered is incorrect')
 })
 
 const toggleMode = () => {
@@ -183,11 +223,27 @@ const toggleMode = () => {
   resetForm()
 }
 
+const switchToSignUp = () => {
+  isSignUp.value = true
+  error.value = ''
+  successMessage.value = ''
+  // Keep the email if it was entered
+  form.password = ''
+  form.confirmPassword = ''
+}
+
 const resetForm = () => {
   form.fullName = ''
   form.email = ''
   form.password = ''
   form.confirmPassword = ''
+}
+
+const closeResetModal = () => {
+  showResetPassword.value = false
+  resetEmail.value = ''
+  resetError.value = ''
+  resetSuccess.value = ''
 }
 
 const handleSubmit = async () => {
@@ -230,14 +286,20 @@ const handleSubmit = async () => {
 }
 
 const handleResetPassword = async () => {
+  resetError.value = ''
+  resetSuccess.value = ''
+  
   try {
     loading.value = true
     await authStore.resetPassword(resetEmail.value)
-    successMessage.value = 'Password reset link sent to your email.'
-    showResetPassword.value = false
-    resetEmail.value = ''
+    resetSuccess.value = 'Password reset link sent to your email.'
+    
+    // Close modal after 3 seconds
+    setTimeout(() => {
+      closeResetModal()
+    }, 3000)
   } catch (err: any) {
-    error.value = err.message || 'An error occurred. Please try again.'
+    resetError.value = err.message || 'An error occurred. Please try again.'
   } finally {
     loading.value = false
   }
