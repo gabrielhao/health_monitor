@@ -16,6 +16,19 @@ export const useAuthStore = defineStore('auth', () => {
   const initialize = async () => {
     try {
       loading.value = true
+      
+      // Test connection first
+      const { data: connectionTest, error: connectionError } = await supabase
+        .from('user_profiles')
+        .select('count')
+        .limit(1)
+        .maybeSingle()
+
+      if (connectionError && connectionError.message.includes('Failed to fetch')) {
+        console.error('Supabase connection failed:', connectionError)
+        throw new Error('Unable to connect to the database. Please check your internet connection and try again.')
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       
       if (session?.user) {
@@ -33,8 +46,9 @@ export const useAuthStore = defineStore('auth', () => {
           profile.value = null
         }
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initializing auth:', error)
+      // Don't throw the error to prevent app crash, just log it
     } finally {
       loading.value = false
       initialized.value = true
@@ -53,13 +67,17 @@ export const useAuthStore = defineStore('auth', () => {
         .maybeSingle()
 
       if (error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the database. Please check your internet connection.')
+        }
         throw error
       }
 
       // Set profile to data (which will be null if no profile found)
       profile.value = data
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching profile:', error)
+      // Don't throw the error to prevent app crash
     }
   }
 
@@ -83,6 +101,9 @@ export const useAuthStore = defineStore('auth', () => {
         }
         if (error.message.includes('email')) {
           throw new Error('Please enter a valid email address.')
+        }
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the server. Please check your internet connection and try again.')
         }
         throw new Error(error.message)
       }
@@ -128,6 +149,9 @@ export const useAuthStore = defineStore('auth', () => {
         if (error.message.includes('Too many requests')) {
           throw new Error('Too many sign-in attempts. Please wait a few minutes before trying again.')
         }
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the server. Please check your internet connection and try again.')
+        }
         throw new Error(error.message)
       }
 
@@ -150,13 +174,22 @@ export const useAuthStore = defineStore('auth', () => {
       
       const { error } = await supabase.auth.signOut()
       
-      if (error) throw error
+      if (error) {
+        if (error.message.includes('Failed to fetch')) {
+          // If we can't connect to sign out, just clear local state
+          console.warn('Unable to connect to server for sign out, clearing local session')
+        } else {
+          throw error
+        }
+      }
 
       user.value = null
       profile.value = null
     } catch (error) {
       console.error('Error signing out:', error)
-      throw error
+      // Clear local state even if server sign out fails
+      user.value = null
+      profile.value = null
     } finally {
       loading.value = false
     }
@@ -174,7 +207,12 @@ export const useAuthStore = defineStore('auth', () => {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the database. Please check your internet connection.')
+        }
+        throw error
+      }
 
       profile.value = data
       return data
@@ -198,7 +236,12 @@ export const useAuthStore = defineStore('auth', () => {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the database. Please check your internet connection.')
+        }
+        throw error
+      }
 
       profile.value = data
       return data
@@ -218,6 +261,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (error) {
         if (error.message.includes('email')) {
           throw new Error('Please enter a valid email address.')
+        }
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the server. Please check your internet connection and try again.')
         }
         throw new Error(error.message)
       }
