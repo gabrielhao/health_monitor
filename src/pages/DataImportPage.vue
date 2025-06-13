@@ -81,10 +81,10 @@
                 or drag and drop
               </p>
               <p class="text-sm text-neutral-500">
-                Supports XML, JSON, CSV, ZIP files up to 5GB
+                Supports XML, JSON, CSV, ZIP files up to 1GB
               </p>
-              <p class="text-xs text-warning-600 mt-2">
-                ⚠️ Large files (>100MB) may take several minutes to process
+              <p class="text-xs text-primary-600 mt-2">
+                ✓ Large files automatically use chunked upload with resume capability
               </p>
             </div>
             
@@ -100,11 +100,10 @@
                 </button>
               </div>
               
-              <!-- Large file warning -->
-              <div v-if="uploadForm.file.size > 100 * 1024 * 1024" class="mt-2 p-2 bg-warning-50 border border-warning-200 rounded">
-                <p class="text-xs text-warning-700">
-                  <strong>Large File Detected:</strong> This file is {{ formatFileSize(uploadForm.file.size) }}. 
-                  Processing may take 5-15 minutes depending on file complexity.
+              <!-- Large file info -->
+              <div v-if="uploadForm.file.size > 100 * 1024 * 1024" class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                <p class="text-xs text-blue-700">
+                  <strong>Large File Detected:</strong> This {{ formatFileSize(uploadForm.file.size) }} file will be uploaded using chunked upload for reliability and resume capability.
                 </p>
               </div>
             </div>
@@ -122,44 +121,46 @@
             ></textarea>
           </div>
 
-          <!-- Processing Options for Large Files -->
-          <div v-if="uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024 && !isXMLFile(uploadForm.file)" class="space-y-3">
-            <div class="border border-warning-200 rounded-lg p-4 bg-warning-50">
-              <h4 class="font-medium text-warning-900 mb-2">Large File Processing Options</h4>
+          <!-- Advanced Options for Large Files -->
+          <div v-if="uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024" class="space-y-3">
+            <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
+              <h4 class="font-medium text-blue-900 mb-2">Large File Upload Options</h4>
               <div class="space-y-2">
                 <label class="flex items-center">
                   <input 
                     type="radio" 
-                    v-model="uploadForm.processingMode" 
-                    value="streaming" 
+                    v-model="uploadForm.chunkSize" 
+                    :value="5 * 1024 * 1024" 
                     class="mr-2"
                   />
-                  <span class="text-sm text-warning-800">
-                    <strong>Streaming Mode (Recommended)</strong> - Process file in chunks to avoid memory issues
+                  <span class="text-sm text-blue-800">
+                    <strong>Standard Chunks (5MB)</strong> - Recommended for most connections
                   </span>
                 </label>
                 <label class="flex items-center">
                   <input 
                     type="radio" 
-                    v-model="uploadForm.processingMode" 
-                    value="full" 
+                    v-model="uploadForm.chunkSize" 
+                    :value="10 * 1024 * 1024" 
                     class="mr-2"
                   />
-                  <span class="text-sm text-warning-800">
-                    <strong>Full Load</strong> - Load entire file into memory (may fail for very large files)
+                  <span class="text-sm text-blue-800">
+                    <strong>Large Chunks (10MB)</strong> - For fast, stable connections
+                  </span>
+                </label>
+                <label class="flex items-center">
+                  <input 
+                    type="radio" 
+                    v-model="uploadForm.chunkSize" 
+                    :value="2 * 1024 * 1024" 
+                    class="mr-2"
+                  />
+                  <span class="text-sm text-blue-800">
+                    <strong>Small Chunks (2MB)</strong> - For slower or unstable connections
                   </span>
                 </label>
               </div>
             </div>
-          </div>
-
-          <!-- XML File Notice -->
-          <div v-if="uploadForm.file && isXMLFile(uploadForm.file) && uploadForm.file.size > 100 * 1024 * 1024" class="border border-blue-200 rounded-lg p-4 bg-blue-50">
-            <h4 class="font-medium text-blue-900 mb-2">XML File Processing</h4>
-            <p class="text-sm text-blue-800">
-              XML files require complete structure parsing and will be processed using full load mode regardless of size.
-              Large XML files may take longer to process but will maintain data integrity.
-            </p>
           </div>
 
           <!-- Error Display -->
@@ -171,7 +172,7 @@
                 </svg>
               </div>
               <div class="ml-3">
-                <h3 class="text-sm font-medium text-error-800">Import Failed</h3>
+                <h3 class="text-sm font-medium text-error-800">Upload Failed</h3>
                 <p class="text-sm text-error-700 mt-1">{{ uploadError }}</p>
                 <div v-if="uploadErrorDetails" class="mt-2">
                   <details class="text-xs text-error-600">
@@ -183,27 +184,12 @@
             </div>
           </div>
 
-          <!-- Processing Progress -->
-          <div v-if="processingProgress.active" class="bg-primary-50 border border-primary-200 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-medium text-primary-900">{{ processingProgress.stage }}</span>
-              <span class="text-sm text-primary-700">{{ processingProgress.percentage }}%</span>
-            </div>
-            <div class="w-full bg-primary-200 rounded-full h-2">
-              <div 
-                class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                :style="{ width: `${processingProgress.percentage}%` }"
-              ></div>
-            </div>
-            <p class="text-xs text-primary-700 mt-2">{{ processingProgress.message }}</p>
-          </div>
-
           <button
             @click="handleUpload"
-            :disabled="!uploadForm.source || !uploadForm.file || vectorStore.importing || processingProgress.active"
+            :disabled="!uploadForm.source || !uploadForm.file || fileUpload.uploading.value"
             class="btn-primary w-full"
           >
-            <div v-if="vectorStore.importing || processingProgress.active" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            <div v-if="fileUpload.uploading.value" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
             {{ getUploadButtonText() }}
           </button>
         </div>
@@ -249,9 +235,22 @@
       </div>
     </div>
 
-    <!-- Import Progress -->
+    <!-- Upload Progress -->
+    <div v-if="fileUpload.uploading.value || (fileUpload.progress.value.percentage > 0 && fileUpload.progress.value.percentage < 100)" class="mb-8">
+      <FileUploadProgress
+        :file-name="uploadForm.file?.name || ''"
+        :progress="fileUpload.progress.value"
+        :uploading="fileUpload.uploading.value"
+        :error="fileUpload.error.value"
+        :formatted-speed="fileUpload.formattedSpeed.value"
+        :formatted-e-t-a="fileUpload.formattedETA.value"
+        @cancel="fileUpload.cancelUpload"
+      />
+    </div>
+
+    <!-- Processing Progress -->
     <div v-if="currentImport" class="card mb-8">
-      <h2 class="text-xl font-semibold text-neutral-900 mb-4">Import Progress</h2>
+      <h2 class="text-xl font-semibold text-neutral-900 mb-4">Processing Progress</h2>
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <span class="text-sm font-medium text-neutral-700">Processing {{ currentImport.source_app }} data...</span>
@@ -264,10 +263,10 @@
           ></div>
         </div>
         <div v-if="currentImport.status === 'completed'" class="text-sm text-success-600">
-          ✓ Import completed successfully
+          ✓ Processing completed successfully
         </div>
         <div v-if="currentImport.status === 'failed'" class="text-sm text-error-600">
-          ✗ Import failed
+          ✗ Processing failed
         </div>
       </div>
     </div>
@@ -438,7 +437,10 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useVectorStore } from '@/stores/vector'
 import { useRouter } from 'vue-router'
+import { useFileUpload } from '@/composables/useFileUpload'
 import { format } from 'date-fns'
+import { supabase } from '@/services/supabase'
+import FileUploadProgress from '@/components/shared/FileUploadProgress.vue'
 import {
   CloudArrowUpIcon,
   DocumentIcon,
@@ -455,6 +457,7 @@ import type { ImportSession } from '@/types/vector'
 
 const vectorStore = useVectorStore()
 const router = useRouter()
+const fileUpload = useFileUpload()
 
 const showSampleData = ref(false)
 const selectedSession = ref<ImportSession | null>(null)
@@ -464,18 +467,11 @@ const fileInput = ref<HTMLInputElement>()
 const uploadError = ref('')
 const uploadErrorDetails = ref('')
 
-const processingProgress = reactive({
-  active: false,
-  stage: '',
-  percentage: 0,
-  message: ''
-})
-
 const uploadForm = reactive({
   source: '',
   file: null as File | null,
   notes: '',
-  processingMode: 'streaming'
+  chunkSize: 5 * 1024 * 1024 // Default 5MB chunks
 })
 
 const supportedSources = [
@@ -521,10 +517,6 @@ const supportedSources = [
   }
 ]
 
-const isXMLFile = (file: File): boolean => {
-  return file.name.toLowerCase().endsWith('.xml')
-}
-
 const handleFileSelect = (event: Event) => {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
@@ -550,17 +542,18 @@ const clearFile = () => {
   uploadForm.file = null
   uploadError.value = ''
   uploadErrorDetails.value = ''
+  fileUpload.resetProgress()
   if (fileInput.value) {
     fileInput.value.value = ''
   }
 }
 
 const validateFile = (file: File) => {
-  const maxSize = 5 * 1024 * 1024 * 1024 // 5GB
+  const maxSize = 1024 * 1024 * 1024 // 1GB
   const allowedTypes = ['.xml', '.json', '.csv', '.zip']
   
   if (file.size > maxSize) {
-    uploadError.value = 'File size must be less than 5GB'
+    uploadError.value = 'File size must be less than 1GB'
     uploadForm.file = null
     return false
   }
@@ -572,41 +565,17 @@ const validateFile = (file: File) => {
     return false
   }
   
-  // Set default processing mode based on file size and type
-  if (file.size > 100 * 1024 * 1024 && !isXMLFile(file)) {
-    uploadForm.processingMode = 'streaming'
-  } else {
-    uploadForm.processingMode = 'full'
-  }
-  
   return true
 }
 
 const getUploadButtonText = () => {
-  if (processingProgress.active) {
-    return 'Processing File...'
-  }
-  if (vectorStore.importing) {
-    return 'Importing Data...'
+  if (fileUpload.uploading.value) {
+    return 'Uploading...'
   }
   if (uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024) {
-    return 'Import Large File'
+    return 'Upload Large File'
   }
   return 'Import Data'
-}
-
-const updateProgress = (stage: string, percentage: number, message: string) => {
-  processingProgress.active = true
-  processingProgress.stage = stage
-  processingProgress.percentage = percentage
-  processingProgress.message = message
-}
-
-const clearProgress = () => {
-  processingProgress.active = false
-  processingProgress.stage = ''
-  processingProgress.percentage = 0
-  processingProgress.message = ''
 }
 
 const handleUpload = async () => {
@@ -616,305 +585,56 @@ const handleUpload = async () => {
   uploadErrorDetails.value = ''
 
   try {
-    updateProgress('Preparing file...', 10, 'Validating file format and size')
-
-    // Always use standard upload for XML files to maintain structure integrity
-    // For non-XML large files, use streaming approach if selected
-    if (uploadForm.file.size > 100 * 1024 * 1024 && 
-        uploadForm.processingMode === 'streaming' && 
-        !isXMLFile(uploadForm.file)) {
-      await handleLargeFileUpload()
-    } else {
-      await handleStandardUpload()
-    }
-
-  } catch (error: any) {
-    console.error('Upload failed:', error)
-    uploadError.value = error.message || 'Upload failed. Please try again.'
-    uploadErrorDetails.value = error.stack || error.toString()
-  } finally {
-    clearProgress()
-  }
-}
-
-const handleStandardUpload = async () => {
-  if (!uploadForm.file) return
-
-  updateProgress('Reading file...', 20, 'Loading file content into memory')
-
-  // Read file content
-  const fileContent = await readFileContent(uploadForm.file)
-  
-  updateProgress('Parsing data...', 50, 'Extracting health records from file')
-
-  // Parse data based on file type and source
-  const parsedData = await parseFileData(fileContent, uploadForm.file, uploadForm.source)
-  
-  if (!parsedData || parsedData.length === 0) {
-    throw new Error('No valid health data found in the file')
-  }
-
-  updateProgress('Importing to database...', 80, `Processing ${parsedData.length} health records`)
-
-  const importSession = await vectorStore.importHealthData({
-    source: uploadForm.source,
-    data: parsedData,
-    metadata: {
-      filename: uploadForm.file.name,
-      filesize: uploadForm.file.size,
-      filetype: uploadForm.file.type,
-      notes: uploadForm.notes,
-      processing_mode: isXMLFile(uploadForm.file) ? 'full_xml' : 'standard',
-      uploaded_at: new Date().toISOString()
-    }
-  })
-
-  currentImport.value = importSession
-
-  // Reset form
-  uploadForm.source = ''
-  uploadForm.file = null
-  uploadForm.notes = ''
-  
-  // Refresh import sessions
-  await vectorStore.fetchImportSessions()
-}
-
-const handleLargeFileUpload = async () => {
-  if (!uploadForm.file) return
-
-  updateProgress('Streaming file...', 20, 'Reading file in chunks to avoid memory issues')
-
-  try {
-    // For very large files, we'll process them in chunks
-    const chunkSize = 10 * 1024 * 1024 // 10MB chunks
-    const totalChunks = Math.ceil(uploadForm.file.size / chunkSize)
-    let processedChunks = 0
-    let allData: any[] = []
-
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize
-      const end = Math.min(start + chunkSize, uploadForm.file.size)
-      const chunk = uploadForm.file.slice(start, end)
-      
-      updateProgress(
-        'Processing chunks...', 
-        20 + (processedChunks / totalChunks) * 40,
-        `Processing chunk ${i + 1} of ${totalChunks}`
-      )
-
-      const chunkContent = await readFileContent(chunk)
-      
-      // For JSON/CSV, try to parse each chunk
-      try {
-        const chunkData = await parseFileData(chunkContent, chunk, uploadForm.source)
-        if (chunkData && chunkData.length > 0) {
-          allData.push(...chunkData)
-        }
-      } catch (error) {
-        console.warn(`Failed to parse chunk ${i + 1}:`, error)
-      }
-
-      processedChunks++
-    }
-
-    if (allData.length === 0) {
-      throw new Error('No valid health data found in the file after chunk processing')
-    }
-
-    updateProgress('Importing to database...', 80, `Processing ${allData.length} health records`)
-
-    const importSession = await vectorStore.importHealthData({
-      source: uploadForm.source,
-      data: allData,
-      metadata: {
-        filename: uploadForm.file.name,
-        filesize: uploadForm.file.size,
-        filetype: uploadForm.file.type,
-        notes: uploadForm.notes,
-        processing_mode: 'streaming',
-        chunks_processed: totalChunks,
-        uploaded_at: new Date().toISOString()
+    // Upload file using chunked upload service
+    const filePath = await fileUpload.uploadFile(uploadForm.file, {
+      chunkSize: uploadForm.chunkSize,
+      onProgress: (progress) => {
+        console.log(`Upload progress: ${progress}%`)
+      },
+      onChunkComplete: (chunkIndex, totalChunks) => {
+        console.log(`Chunk ${chunkIndex + 1}/${totalChunks} uploaded`)
       }
     })
 
-    currentImport.value = importSession
+    console.log('File uploaded successfully:', filePath)
+
+    // Start server-side processing
+    const { data, error } = await supabase.functions.invoke('process-health-file', {
+      body: {
+        filePath,
+        source: uploadForm.source,
+        metadata: {
+          filename: uploadForm.file.name,
+          filesize: uploadForm.file.size,
+          filetype: uploadForm.file.type,
+          notes: uploadForm.notes,
+          uploaded_at: new Date().toISOString(),
+          chunk_size: uploadForm.chunkSize
+        }
+      }
+    })
+
+    if (error) {
+      throw new Error(`Processing failed: ${error.message}`)
+    }
+
+    console.log('Processing completed:', data)
+    currentImport.value = data.importSession
 
     // Reset form
     uploadForm.source = ''
     uploadForm.file = null
     uploadForm.notes = ''
+    fileUpload.resetProgress()
     
     // Refresh import sessions
     await vectorStore.fetchImportSessions()
 
-  } catch (error) {
-    throw new Error(`Large file processing failed: ${error}`)
+  } catch (error: any) {
+    console.error('Upload/processing failed:', error)
+    uploadError.value = error.message || 'Upload failed. Please try again.'
+    uploadErrorDetails.value = error.stack || error.toString()
   }
-}
-
-const readFileContent = (file: File | Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => resolve(e.target?.result as string)
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsText(file)
-  })
-}
-
-const parseFileData = async (content: string, file: File | Blob, source: string) => {
-  const fileName = file instanceof File ? file.name : 'unknown'
-  const fileExtension = '.' + fileName.split('.').pop()?.toLowerCase()
-  
-  try {
-    switch (fileExtension) {
-      case '.json':
-        return parseJSONData(content, source)
-      case '.csv':
-        return parseCSVData(content, source)
-      case '.xml':
-        return parseXMLData(content, source)
-      default:
-        throw new Error('Unsupported file format')
-    }
-  } catch (error) {
-    throw new Error(`Failed to parse ${fileExtension} file: ${error}`)
-  }
-}
-
-const parseJSONData = (content: string, source: string) => {
-  const data = JSON.parse(content)
-  
-  if (Array.isArray(data)) {
-    return data
-  } else if (data.data && Array.isArray(data.data)) {
-    return data.data
-  } else {
-    return [data]
-  }
-}
-
-const parseCSVData = (content: string, source: string) => {
-  const lines = content.split('\n').filter(line => line.trim())
-  if (lines.length < 2) throw new Error('CSV file must have at least a header and one data row')
-  
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''))
-  const data = []
-  
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
-    const row: any = {}
-    
-    headers.forEach((header, index) => {
-      row[header] = values[index] || ''
-    })
-    
-    data.push(row)
-  }
-  
-  return data
-}
-
-const parseXMLData = (content: string, source: string) => {
-  // Simple XML parsing for Apple Health exports
-  if (source === 'apple_health') {
-    return parseAppleHealthXML(content)
-  }
-  
-  // For other XML formats, convert to JSON-like structure
-  const parser = new DOMParser()
-  const xmlDoc = parser.parseFromString(content, 'text/xml')
-  
-  if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
-    throw new Error('Invalid XML format')
-  }
-  
-  return extractXMLData(xmlDoc)
-}
-
-const parseAppleHealthXML = (content: string) => {
-  const parser = new DOMParser()
-  const xmlDoc = parser.parseFromString(content, 'text/xml')
-  
-  if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
-    throw new Error('Invalid Apple Health XML format')
-  }
-  
-  const records = xmlDoc.getElementsByTagName('Record')
-  const data = []
-  
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i]
-    const type = record.getAttribute('type') || ''
-    const value = record.getAttribute('value') || ''
-    const unit = record.getAttribute('unit') || ''
-    const startDate = record.getAttribute('startDate') || ''
-    const endDate = record.getAttribute('endDate') || ''
-    const sourceName = record.getAttribute('sourceName') || ''
-    const sourceVersion = record.getAttribute('sourceVersion') || ''
-    const device = record.getAttribute('device') || ''
-    
-    data.push({
-      type,
-      value: isNaN(Number(value)) ? value : Number(value),
-      unit,
-      startDate,
-      endDate,
-      sourceName,
-      sourceVersion,
-      device
-    })
-  }
-  
-  return data
-}
-
-const extractXMLData = (xmlDoc: Document) => {
-  // Generic XML to object conversion
-  const data: any[] = []
-  const rootElement = xmlDoc.documentElement
-  
-  const extractElement = (element: Element): any => {
-    const obj: any = {}
-    
-    // Add attributes
-    for (let i = 0; i < element.attributes.length; i++) {
-      const attr = element.attributes[i]
-      obj[attr.name] = attr.value
-    }
-    
-    // Add child elements
-    for (let i = 0; i < element.children.length; i++) {
-      const child = element.children[i]
-      const childData = extractElement(child)
-      
-      if (obj[child.tagName]) {
-        if (!Array.isArray(obj[child.tagName])) {
-          obj[child.tagName] = [obj[child.tagName]]
-        }
-        obj[child.tagName].push(childData)
-      } else {
-        obj[child.tagName] = childData
-      }
-    }
-    
-    // Add text content if no children
-    if (element.children.length === 0 && element.textContent?.trim()) {
-      return element.textContent.trim()
-    }
-    
-    return obj
-  }
-  
-  if (rootElement.children.length > 0) {
-    for (let i = 0; i < rootElement.children.length; i++) {
-      data.push(extractElement(rootElement.children[i]))
-    }
-  } else {
-    data.push(extractElement(rootElement))
-  }
-  
-  return data
 }
 
 const importSampleData = async () => {
