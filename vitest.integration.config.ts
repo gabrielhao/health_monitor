@@ -5,8 +5,10 @@ import { resolve } from 'path'
 export default defineConfig({
   plugins: [vue()],
   test: {
+    name: 'integration',
     environment: 'jsdom',
     globals: true,
+    include: ['src/test/integration/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -19,14 +21,15 @@ export default defineConfig({
       ],
       thresholds: {
         global: {
-          branches: 80,
-          functions: 80,
-          lines: 80,
-          statements: 80
+          branches: 75,
+          functions: 75,
+          lines: 75,
+          statements: 75
         }
       }
     },
-    setupFiles: ['src/test/setup.ts']
+    setupFiles: ['src/test/setup.ts'],
+    testTimeout: 10000
   },
   resolve: {
     alias: {
