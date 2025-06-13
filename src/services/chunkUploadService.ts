@@ -38,6 +38,12 @@ export class ChunkUploadService {
       onChunkComplete
     } = options
 
+    // Validate file size (5GB limit)
+    const maxFileSize = 5 * 1024 * 1024 * 1024 // 5GB
+    if (file.size > maxFileSize) {
+      throw new Error('File size exceeds 5GB limit')
+    }
+
     // Calculate file checksum
     const fileChecksum = await this.calculateMD5(file)
     

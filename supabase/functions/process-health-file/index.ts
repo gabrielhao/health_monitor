@@ -1,13 +1,13 @@
 /*
   # Process Health File Edge Function
 
-  This function handles server-side processing of large health data files.
+  This function handles server-side processing of large health data files up to 5GB.
   It downloads files from Supabase Storage, parses them completely, and imports the data.
 
   1. File Processing
     - Downloads file from Supabase Storage
     - Parses XML, JSON, CSV files completely without chunking issues
-    - Handles large files efficiently on the server side
+    - Handles large files efficiently on the server side (up to 5GB)
 
   2. Data Import
     - Creates import session
@@ -78,6 +78,13 @@ Deno.serve(async (req: Request) => {
     const { filePath, source, metadata }: ProcessFileRequest = await req.json()
 
     console.log(`Processing file: ${filePath} for user: ${user.id}`)
+    console.log(`File size from metadata: ${metadata.filesize} bytes (${(metadata.filesize / (1024 * 1024 * 1024)).toFixed(2)} GB)`)
+
+    // Validate file size (5GB limit)
+    const maxFileSize = 5 * 1024 * 1024 * 1024 // 5GB
+    if (metadata.filesize > maxFileSize) {
+      throw new Error(`File size ${metadata.filesize} bytes exceeds 5GB limit`)
+    }
 
     // Create import session
     const { data: importSession, error: sessionError } = await supabase

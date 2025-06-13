@@ -81,7 +81,7 @@
                 or drag and drop
               </p>
               <p class="text-sm text-neutral-500">
-                Supports XML, JSON, CSV, ZIP files up to 1GB
+                Supports XML, JSON, CSV, ZIP files up to 5GB
               </p>
               <p class="text-xs text-primary-600 mt-2">
                 ✓ Large files automatically use chunked upload with resume capability
@@ -549,11 +549,11 @@ const clearFile = () => {
 }
 
 const validateFile = (file: File) => {
-  const maxSize = 1024 * 1024 * 1024 // 1GB
+  const maxSize = 5 * 1024 * 1024 * 1024 // 5GB
   const allowedTypes = ['.xml', '.json', '.csv', '.zip']
   
   if (file.size > maxSize) {
-    uploadError.value = 'File size must be less than 1GB'
+    uploadError.value = 'File size must be less than 5GB'
     uploadForm.file = null
     return false
   }
