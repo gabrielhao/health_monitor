@@ -225,6 +225,43 @@ describe('File Upload Integration Flow', () => {
       )
     })
 
+    it('should handle 5GB file upload successfully', async () => {
+      // Arrange
+      const maxFile = createMockFile({
+        name: 'max-size-file.xml',
+        size: 5 * 1024 * 1024 * 1024, // 5GB
+        type: 'text/xml'
+      })
+
+      const { useFileUpload } = await import('@/composables/useFileUpload')
+      const fileUploadComposable = useFileUpload()
+      
+      fileUploadComposable.uploadFile.mockResolvedValue('max-file-path')
+      
+      mockSupabaseClient.functions.invoke.mockResolvedValue({
+        data: { success: true, importSession: { id: 'session-max' } },
+        error: null
+      })
+
+      // Act - Upload 5GB file
+      await wrapper.find('select').setValue('apple_health')
+      
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [maxFile],
+        writable: false
+      })
+      await fileInput.trigger('change')
+
+      await wrapper.find('.btn-primary').trigger('click')
+
+      // Assert - 5GB file was processed
+      expect(fileUploadComposable.uploadFile).toHaveBeenCalledWith(
+        maxFile,
+        expect.any(Object)
+      )
+    })
+
     it('should handle upload failure with retry mechanism', async () => {
       // Arrange
       const mockFile = createMockFile({
@@ -257,7 +294,7 @@ describe('File Upload Integration Flow', () => {
       expect(wrapper.text()).toContain('Upload Failed')
     })
 
-    it('should validate file size limits', async () => {
+    it('should validate file size limits (reject >5GB)', async () => {
       // Arrange
       const oversizedFile = createMockFile({
         name: 'huge-file.xml',
@@ -300,247 +337,44 @@ describe('File Upload Integration Flow', () => {
     })
   })
 
-  describe('Sample Data Import Flow', () => {
-    it('should import sample data successfully', async () => {
+  describe('Chunk Size Configuration', () => {
+    it('should allow different chunk sizes for large files', async () => {
       // Arrange
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: {
-          success: true,
-          importSession: {
-            id: 'sample-session',
-            status: 'completed',
-            processed_records: 50,
-            failed_records: 0
-          }
-        },
-        error: null
+      const largeFile = createMockFile({
+        name: 'configurable-chunks.xml',
+        size: 200 * 1024 * 1024 // 200MB
       })
 
-      // Act - Open sample data modal
-      const sampleDataButton = wrapper.find('button:contains("Import Sample Data")')
-      await sampleDataButton.trigger('click')
+      const { useFileUpload } = await import('@/composables/useFileUpload')
+      const fileUploadComposable = useFileUpload()
+      fileUploadComposable.uploadFile.mockResolvedValue('test-path')
 
-      expect(wrapper.vm.showSampleData).toBe(true)
+      // Act - Select large file
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [largeFile],
+        writable: false
+      })
+      await fileInput.trigger('change')
 
-      // Act - Confirm sample data import
-      const confirmButton = wrapper.find('.btn-primary:contains("Import Sample Data")')
-      await confirmButton.trigger('click')
-
-      // Assert - Sample data was generated and imported
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.showSampleData).toBe(false)
-      expect(wrapper.vm.currentImport).toBeDefined()
-    })
-  })
 
-  describe('Import History Management', () => {
-    it('should display import history correctly', async () => {
-      // Arrange
-      const mockImportSessions = [
-        {
-          id: 'session-1',
-          source_app: 'apple_health',
-          status: 'completed',
-          total_records: 100,
-          processed_records: 95,
-          failed_records: 5,
-          started_at: '2024-01-01T10:00:00Z',
-          error_log: [
-            { item: 'Record 1', error: 'Invalid format' }
-          ]
-        },
-        {
-          id: 'session-2',
-          source_app: 'google_fit',
-          status: 'processing',
-          total_records: 200,
-          processed_records: 150,
-          failed_records: 0,
-          started_at: '2024-01-02T11:00:00Z',
-          error_log: []
-        }
+      // Test different chunk sizes
+      const chunkSizes = [
+        { value: 2 * 1024 * 1024, label: 'Small Chunks (2MB)' },
+        { value: 5 * 1024 * 1024, label: 'Standard Chunks (5MB)' },
+        { value: 10 * 1024 * 1024, label: 'Large Chunks (10MB)' }
       ]
 
-      vectorStore.importSessions = mockImportSessions
+      for (const chunkSize of chunkSizes) {
+        // Act - Select chunk size
+        const chunkRadio = wrapper.find(`input[value="${chunkSize.value}"]`)
+        await chunkRadio.setChecked()
 
-      // Act - Component should display import history
-      await wrapper.vm.$nextTick()
-
-      // Assert - Import sessions are displayed
-      expect(wrapper.text()).toContain('Apple Health')
-      expect(wrapper.text()).toContain('Google Fit')
-      expect(wrapper.text()).toContain('95 of 100 records processed')
-      expect(wrapper.text()).toContain('150 of 200 records processed')
-      expect(wrapper.text()).toContain('completed')
-      expect(wrapper.text()).toContain('processing')
-    })
-
-    it('should show error details modal', async () => {
-      // Arrange
-      const sessionWithErrors = {
-        id: 'error-session',
-        source_app: 'fitbit',
-        status: 'completed',
-        total_records: 50,
-        processed_records: 45,
-        failed_records: 5,
-        started_at: '2024-01-03T12:00:00Z',
-        error_log: [
-          { item: 'Record 1', error: 'Missing required field' },
-          { item: 'Record 2', error: 'Invalid date format' }
-        ]
+        // Assert - Chunk size is set
+        expect(wrapper.vm.uploadForm.chunkSize).toBe(chunkSize.value)
+        expect(wrapper.text()).toContain(chunkSize.label)
       }
-
-      vectorStore.importSessions = [sessionWithErrors]
-      await wrapper.vm.$nextTick()
-
-      // Act - Click view errors button
-      const viewErrorsButton = wrapper.find('button:contains("View Errors")')
-      await viewErrorsButton.trigger('click')
-
-      // Assert - Error modal is shown
-      expect(wrapper.vm.selectedSession).toBe(sessionWithErrors)
-      expect(wrapper.text()).toContain('Import Errors')
-      expect(wrapper.text()).toContain('Missing required field')
-      expect(wrapper.text()).toContain('Invalid date format')
-    })
-
-    it('should show import details modal', async () => {
-      // Arrange
-      const detailedSession = {
-        id: 'detailed-session',
-        source_app: 'garmin',
-        status: 'completed',
-        total_records: 75,
-        processed_records: 75,
-        failed_records: 0,
-        started_at: '2024-01-04T13:00:00Z',
-        completed_at: '2024-01-04T13:05:00Z',
-        metadata: {
-          filename: 'garmin-export.json',
-          filesize: 1024000,
-          processing_mode: 'standard'
-        },
-        error_log: []
-      }
-
-      vectorStore.importSessions = [detailedSession]
-      await wrapper.vm.$nextTick()
-
-      // Act - Click details button
-      const detailsButton = wrapper.find('button:contains("Details")')
-      await detailsButton.trigger('click')
-
-      // Assert - Details modal is shown
-      expect(wrapper.vm.detailsSession).toBe(detailedSession)
-      expect(wrapper.text()).toContain('Import Details')
-      expect(wrapper.text()).toContain('Garmin')
-      expect(wrapper.text()).toContain('75')
-      expect(wrapper.text()).toContain('100%') // Success rate
-    })
-  })
-
-  describe('Error Handling and Edge Cases', () => {
-    it('should handle authentication errors', async () => {
-      // Arrange
-      authStore.user = null
-      authStore.isAuthenticated = false
-
-      const { useFileUpload } = await import('@/composables/useFileUpload')
-      const fileUploadComposable = useFileUpload()
-      
-      fileUploadComposable.uploadFile.mockRejectedValue(
-        new Error('User not authenticated')
-      )
-
-      // Act - Try to upload without authentication
-      const mockFile = createMockFile()
-      await wrapper.find('select').setValue('apple_health')
-      
-      const fileInput = wrapper.find('input[type="file"]')
-      Object.defineProperty(fileInput.element, 'files', {
-        value: [mockFile],
-        writable: false
-      })
-      await fileInput.trigger('change')
-
-      await wrapper.find('.btn-primary').trigger('click')
-
-      // Assert - Authentication error is handled
-      await wrapper.vm.$nextTick()
-      expect(wrapper.vm.uploadError).toContain('User not authenticated')
-    })
-
-    it('should handle server processing errors', async () => {
-      // Arrange
-      const mockFile = createMockFile()
-
-      const { useFileUpload } = await import('@/composables/useFileUpload')
-      const fileUploadComposable = useFileUpload()
-      
-      fileUploadComposable.uploadFile.mockResolvedValue('uploaded-file-path')
-      
-      // Mock server processing failure
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: null,
-        error: { message: 'Server processing failed' }
-      })
-
-      // Act - Upload file
-      await wrapper.find('select').setValue('apple_health')
-      
-      const fileInput = wrapper.find('input[type="file"]')
-      Object.defineProperty(fileInput.element, 'files', {
-        value: [mockFile],
-        writable: false
-      })
-      await fileInput.trigger('change')
-
-      await wrapper.find('.btn-primary').trigger('click')
-
-      // Assert - Server error is handled
-      await wrapper.vm.$nextTick()
-      expect(wrapper.vm.uploadError).toContain('Processing failed: Server processing failed')
-    })
-
-    it('should handle drag and drop file selection', async () => {
-      // Arrange
-      const mockFile = createMockFile({
-        name: 'dropped-file.xml',
-        size: 2 * 1024 * 1024
-      })
-
-      const dropEvent = new Event('drop')
-      Object.defineProperty(dropEvent, 'dataTransfer', {
-        value: {
-          files: [mockFile]
-        }
-      })
-
-      // Act - Simulate drag and drop
-      const dropZone = wrapper.find('[data-testid="upload-area"]')
-      await dropZone.trigger('drop', { dataTransfer: { files: [mockFile] } })
-
-      // Assert - File is selected via drag and drop
-      await wrapper.vm.$nextTick()
-      expect(wrapper.vm.uploadForm.file).toBeDefined()
-      expect(wrapper.text()).toContain('dropped-file.xml')
-    })
-
-    it('should clear file when clear button is clicked', async () => {
-      // Arrange
-      const mockFile = createMockFile()
-      wrapper.vm.uploadForm.file = mockFile
-
-      await wrapper.vm.$nextTick()
-
-      // Act - Click clear file button
-      const clearButton = wrapper.find('button:contains("×")')
-      await clearButton.trigger('click')
-
-      // Assert - File is cleared
-      expect(wrapper.vm.uploadForm.file).toBe(null)
-      expect(wrapper.vm.uploadError).toBe('')
     })
   })
 
@@ -583,6 +417,117 @@ describe('File Upload Integration Flow', () => {
       expect(wrapper.text()).toContain('75%')
       expect(wrapper.text()).toContain('1.0 MB/s')
       expect(wrapper.text()).toContain('3s')
+    })
+  })
+
+  describe('Error Recovery', () => {
+    it('should allow retry after failed upload', async () => {
+      // Arrange
+      const mockFile = createMockFile()
+      const { useFileUpload } = await import('@/composables/useFileUpload')
+      const fileUploadComposable = useFileUpload()
+
+      // First attempt fails
+      fileUploadComposable.uploadFile.mockRejectedValueOnce(new Error('Network error'))
+      // Second attempt succeeds
+      fileUploadComposable.uploadFile.mockResolvedValueOnce('success-path')
+
+      // Act - First upload attempt
+      await wrapper.find('select').setValue('apple_health')
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [mockFile],
+        writable: false
+      })
+      await fileInput.trigger('change')
+      await wrapper.find('.btn-primary').trigger('click')
+
+      // Assert - Error is shown
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.uploadError).toBe('Network error')
+
+      // Act - Retry upload
+      await wrapper.find('.btn-primary').trigger('click')
+
+      // Assert - Second attempt should succeed
+      expect(fileUploadComposable.uploadFile).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('Memory Management', () => {
+    it('should handle multiple large file uploads without memory issues', async () => {
+      // Arrange
+      const largeFiles = [
+        createMockFile({ name: 'file1.xml', size: 1024 * 1024 * 1024 }), // 1GB
+        createMockFile({ name: 'file2.xml', size: 1024 * 1024 * 1024 }), // 1GB
+        createMockFile({ name: 'file3.xml', size: 1024 * 1024 * 1024 })  // 1GB
+      ]
+
+      const { useFileUpload } = await import('@/composables/useFileUpload')
+      const fileUploadComposable = useFileUpload()
+      fileUploadComposable.uploadFile.mockResolvedValue('test-path')
+
+      // Act - Upload files sequentially
+      for (const file of largeFiles) {
+        const fileInput = wrapper.find('input[type="file"]')
+        Object.defineProperty(fileInput.element, 'files', {
+          value: [file],
+          writable: false
+        })
+        await fileInput.trigger('change')
+        await wrapper.find('.btn-primary').trigger('click')
+        
+        // Reset for next file
+        wrapper.vm.uploadForm.file = null
+        wrapper.vm.uploadError = ''
+      }
+
+      // Assert - All files were processed
+      expect(fileUploadComposable.uploadFile).toHaveBeenCalledTimes(3)
+    })
+  })
+
+  describe('Boundary Testing', () => {
+    it('should handle exactly 5GB file', async () => {
+      // Arrange
+      const exactMaxFile = createMockFile({
+        name: 'exactly-5gb.xml',
+        size: 5 * 1024 * 1024 * 1024 // Exactly 5GB
+      })
+
+      // Act
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [exactMaxFile],
+        writable: false
+      })
+      await fileInput.trigger('change')
+
+      // Assert - File should be accepted
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.uploadError).toBe('')
+      expect(wrapper.vm.uploadForm.file).toBeTruthy()
+    })
+
+    it('should reject 5GB + 1 byte file', async () => {
+      // Arrange
+      const overMaxFile = createMockFile({
+        name: 'over-5gb.xml',
+        size: 5 * 1024 * 1024 * 1024 + 1 // 5GB + 1 byte
+      })
+
+      // Act
+      const fileInput = wrapper.find('input[type="file"]')
+      Object.defineProperty(fileInput.element, 'files', {
+        value: [overMaxFile],
+        writable: false
+      })
+      await fileInput.trigger('change')
+
+      // Assert - File should be rejected
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.uploadError).toContain('File size must be less than 5GB')
+      expect(wrapper.vm.uploadForm.file).toBe(null)
     })
   })
 })

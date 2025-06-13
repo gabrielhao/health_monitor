@@ -31,6 +31,18 @@ export const coverageConfig = {
       functions: 90,
       lines: 85,
       statements: 85
+    },
+    'src/pages/DataImportPage.vue': {
+      branches: 80,
+      functions: 85,
+      lines: 80,
+      statements: 80
+    },
+    'src/components/shared/FileUploadProgress.vue': {
+      branches: 85,
+      functions: 90,
+      lines: 85,
+      statements: 85
     }
   },
   
@@ -42,12 +54,20 @@ export const coverageConfig = {
     '**/*.config.*',
     '**/coverage/**',
     'src/main.ts',
-    'src/vite-env.d.ts'
+    'src/vite-env.d.ts',
+    'src/assets/**',
+    'public/**'
   ],
   
   // Coverage reporters
   reporter: ['text', 'json', 'html', 'lcov'],
   
   // Output directory
-  reportsDirectory: './coverage'
+  reportsDirectory: './coverage',
+  
+  // Additional configuration
+  all: true,
+  skipFull: false,
+  clean: true,
+  cleanOnRerun: true
 }

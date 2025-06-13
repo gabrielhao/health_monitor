@@ -161,6 +161,26 @@ describe('ChunkUploadService', () => {
         timeout: 1000 // 1 second timeout
       })).rejects.toThrow('Chunk upload timeout')
     })
+
+    it('should handle 5GB file at boundary', async () => {
+      // Arrange
+      const maxSizeFile = createMockFile({
+        name: 'max-size-file.xml',
+        size: 5 * 1024 * 1024 * 1024 // Exactly 5GB
+      })
+
+      mockSupabaseClient.storage.from().upload.mockResolvedValue({ error: null })
+      mockSupabaseClient.functions.invoke.mockResolvedValue({
+        data: { filePath: 'test-path' },
+        error: null
+      })
+
+      // Act
+      const result = await service.uploadFile(userId, maxSizeFile)
+
+      // Assert
+      expect(result).toBe('test-path')
+    })
   })
 
   describe('getUploadProgress', () => {
@@ -282,6 +302,57 @@ describe('ChunkUploadService', () => {
       })).rejects.toThrow()
 
       expect(mockSupabaseClient.storage.from().remove).toHaveBeenCalled()
+    })
+
+    it('should handle concurrent uploads', async () => {
+      // Arrange
+      const file1 = createMockFile({ name: 'file1.xml', size: 1024 })
+      const file2 = createMockFile({ name: 'file2.xml', size: 2048 })
+
+      mockSupabaseClient.storage.from().upload.mockResolvedValue({ error: null })
+      mockSupabaseClient.functions.invoke.mockResolvedValue({
+        data: { filePath: 'test-path' },
+        error: null
+      })
+
+      // Act
+      const [result1, result2] = await Promise.all([
+        service.uploadFile(userId, file1),
+        service.uploadFile(userId, file2)
+      ])
+
+      // Assert
+      expect(result1).toBe('test-path')
+      expect(result2).toBe('test-path')
+    })
+  })
+
+  describe('Performance Tests', () => {
+    it('should handle multiple chunk uploads efficiently', async () => {
+      // Arrange
+      const largeFile = createMockFile({
+        name: 'performance-test.xml',
+        size: 100 * 1024 * 1024 // 100MB
+      })
+
+      mockSupabaseClient.storage.from().upload.mockResolvedValue({ error: null })
+      mockSupabaseClient.functions.invoke.mockResolvedValue({
+        data: { filePath: 'test-path' },
+        error: null
+      })
+
+      const startTime = Date.now()
+
+      // Act
+      await service.uploadFile(userId, largeFile, {
+        chunkSize: 5 * 1024 * 1024 // 5MB chunks = 20 chunks
+      })
+
+      const endTime = Date.now()
+
+      // Assert
+      expect(endTime - startTime).toBeLessThan(5000) // Should complete within 5 seconds in test
+      expect(mockSupabaseClient.storage.from().upload).toHaveBeenCalledTimes(20)
     })
   })
 })

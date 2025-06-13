@@ -176,3 +176,64 @@ export function simulateFileUpload(
     uploadChunk()
   })
 }
+
+export function createLargeFileTestData(sizeInMB: number): string {
+  const chunkSize = 1024 // 1KB chunks
+  const totalChunks = sizeInMB * 1024 // MB to KB
+  
+  let data = ''
+  for (let i = 0; i < totalChunks; i++) {
+    data += 'a'.repeat(chunkSize)
+  }
+  
+  return data
+}
+
+export function measureMemoryUsage(): number {
+  if ('memory' in performance) {
+    return (performance as any).memory.usedJSHeapSize
+  }
+  return 0
+}
+
+export function createMock5GBFile(): File {
+  return {
+    name: '5gb-test-file.xml',
+    size: 5 * 1024 * 1024 * 1024, // 5GB
+    type: 'text/xml',
+    lastModified: Date.now(),
+    slice: vi.fn((start, end) => new Blob(['mock chunk'], { type: 'text/xml' })),
+    arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
+    text: vi.fn().mockResolvedValue('mock file content'),
+    stream: vi.fn().mockReturnValue(new ReadableStream())
+  } as File
+}
+
+export function createMockChunkedUploadSession(fileSize: number, chunkSize: number = 5 * 1024 * 1024) {
+  const totalChunks = Math.ceil(fileSize / chunkSize)
+  
+  return {
+    id: 'chunked-session-id',
+    fileName: 'chunked-file.xml',
+    fileSize,
+    totalChunks,
+    uploadedChunks: new Set<number>(),
+    checksum: 'mock-checksum',
+    createdAt: new Date()
+  }
+}
+
+export function simulateNetworkLatency(ms: number = 100): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export function createMockProgressCallback() {
+  const calls: number[] = []
+  
+  return {
+    callback: (progress: number) => calls.push(progress),
+    getCalls: () => [...calls],
+    getLastCall: () => calls[calls.length - 1],
+    getCallCount: () => calls.length
+  }
+}

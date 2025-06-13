@@ -1,6 +1,6 @@
 # Test Suite Documentation
 
-This directory contains comprehensive unit tests and integration tests for the Aivital health monitoring application.
+This directory contains comprehensive unit tests and integration tests for the Aivital health monitoring application, with special focus on the new 5GB file upload capabilities.
 
 ## Test Structure
 
@@ -14,6 +14,7 @@ src/test/
 ├── stores/             # Pinia store tests
 ├── utils/              # Test helper utilities
 ├── setup.ts            # Global test setup
+├── coverage.config.ts  # Coverage configuration
 └── README.md           # This file
 ```
 
@@ -26,7 +27,7 @@ src/test/
 - **Stores**: Pinia store actions, mutations, and computed properties
 
 ### Integration Tests
-- **File Upload Flow**: End-to-end file upload with chunking and processing
+- **File Upload Flow**: End-to-end file upload with chunking and processing (up to 5GB)
 - **Health Data Management**: Complete CRUD operations for health metrics
 - **Authentication Flow**: Sign up, sign in, profile management
 
@@ -61,9 +62,9 @@ npm run test:ui
 All tests follow the AAA pattern:
 
 ```typescript
-it('should handle successful file upload', async () => {
+it('should handle successful 5GB file upload', async () => {
   // Arrange
-  const mockFile = createMockFile({ size: 1024 * 1024 })
+  const mockFile = createMock5GBFile()
   const mockUploadService = vi.fn().mockResolvedValue('file-path')
   
   // Act
@@ -87,15 +88,20 @@ it('should handle successful file upload', async () => {
 
 ## Key Test Scenarios
 
-### File Upload Tests
+### File Upload Tests (5GB Support)
 - ✅ Small file upload (< 100MB)
-- ✅ Large file upload with chunking (> 100MB)
-- ✅ File size validation (5GB limit)
+- ✅ Large file upload with chunking (100MB - 5GB)
+- ✅ Maximum file size validation (exactly 5GB)
+- ✅ Oversized file rejection (> 5GB)
 - ✅ File type validation (XML, JSON, CSV, ZIP)
-- ✅ Upload progress tracking
+- ✅ Upload progress tracking with chunking
 - ✅ Error handling and retry logic
 - ✅ Network failure scenarios
 - ✅ Authentication requirements
+- ✅ MD5 checksum verification
+- ✅ Resumable upload capability
+- ✅ Concurrent upload handling
+- ✅ Memory efficiency testing
 
 ### Health Data Tests
 - ✅ CRUD operations for health metrics
@@ -105,6 +111,7 @@ it('should handle successful file upload', async () => {
 - ✅ Real-time updates
 - ✅ Error handling
 - ✅ Authentication requirements
+- ✅ Large dataset handling (10,000+ metrics)
 
 ### Authentication Tests
 - ✅ Sign up with email confirmation
@@ -121,6 +128,7 @@ it('should handle successful file upload', async () => {
 - ✅ Component cleanup
 - ✅ Efficient rendering
 - ✅ Background processing
+- ✅ 5GB file processing without memory overflow
 
 ## Mock Utilities
 
@@ -131,6 +139,9 @@ const mockFile = createMockFile({
   size: 10 * 1024 * 1024, // 10MB
   type: 'text/xml'
 })
+
+// For 5GB testing
+const mock5GBFile = createMock5GBFile()
 ```
 
 ### User Mocks
@@ -153,16 +164,25 @@ const bloodPressure = createMockBloodPressureMetric({
 })
 ```
 
+### Upload Progress Mocks
+```typescript
+const progressCallback = createMockProgressCallback()
+const uploadSession = createMockChunkedUploadSession(5 * 1024 * 1024 * 1024) // 5GB
+```
+
 ## Edge Cases Tested
 
 ### File Upload Edge Cases
 - Empty files (0 bytes)
-- Maximum size files (5GB)
+- Maximum size files (exactly 5GB)
+- Oversized files (5GB + 1 byte)
 - Invalid file types
 - Corrupted files
 - Network interruptions
 - Server errors
 - Authentication failures
+- Concurrent uploads
+- Memory constraints during large uploads
 
 ### Data Validation Edge Cases
 - Missing required fields
@@ -173,11 +193,12 @@ const bloodPressure = createMockBloodPressureMetric({
 - Unicode handling
 
 ### Performance Edge Cases
-- Large datasets (1000+ records)
+- Large datasets (10,000+ records)
 - Concurrent operations
 - Memory constraints
 - Slow network conditions
 - Browser compatibility
+- 5GB file processing efficiency
 
 ## Continuous Integration
 
@@ -189,9 +210,10 @@ Tests are automatically run on:
 
 ### CI Requirements
 - All tests must pass
-- Coverage must meet minimum thresholds
+- Coverage must meet minimum thresholds (80% global, 85-90% critical)
 - No console errors or warnings
 - Performance benchmarks must be met
+- Memory usage within acceptable limits
 
 ## Debugging Tests
 
@@ -200,6 +222,7 @@ Tests are automatically run on:
 2. **Mock Leakage**: Clear mocks between tests using `vi.clearAllMocks()`
 3. **DOM Cleanup**: Unmount components after tests to prevent memory leaks
 4. **Timing Issues**: Use `vi.useFakeTimers()` for time-dependent tests
+5. **Large File Mocking**: Use proper file size simulation for 5GB tests
 
 ### Debug Commands
 ```bash
@@ -207,10 +230,13 @@ Tests are automatically run on:
 npm run test -- src/test/services/chunkUploadService.test.ts
 
 # Run tests matching pattern
-npm run test -- --grep "file upload"
+npm run test -- --grep "5GB file upload"
 
 # Debug with browser
 npm run test:ui
+
+# Run with verbose output
+npm run test -- --reporter=verbose
 ```
 
 ## Contributing to Tests
@@ -221,15 +247,17 @@ npm run test:ui
 3. Include both happy path and error scenarios
 4. Maintain minimum coverage requirements
 5. Add documentation for complex test scenarios
+6. Test boundary conditions (especially for file sizes)
 
 ### Test Review Checklist
 - [ ] Tests follow AAA pattern
-- [ ] All edge cases are covered
+- [ ] All edge cases are covered (including 5GB boundary)
 - [ ] Mocks are properly configured
 - [ ] Async operations are handled correctly
 - [ ] Tests are deterministic and reliable
 - [ ] Coverage thresholds are met
 - [ ] Performance implications are considered
+- [ ] Memory usage is within acceptable limits
 
 ## Test Data Management
 
@@ -251,13 +279,55 @@ npm run test:ui
 - Test execution time
 - Memory usage during tests
 - Component render performance
-- File processing speed
+- File processing speed (including 5GB files)
 - Network request efficiency
+- Chunk upload performance
 
 ### Benchmarks
 - Unit tests: < 100ms per test
-- Integration tests: < 5s per test
-- Total test suite: < 2 minutes
-- Memory usage: < 512MB peak
+- Integration tests: < 10s per test (5GB file tests may take longer)
+- Total test suite: < 5 minutes
+- Memory usage: < 1GB peak (for 5GB file tests)
 
-This comprehensive test suite ensures the reliability, performance, and maintainability of the Aivital application while providing confidence in new feature development and refactoring efforts.
+### Large File Testing Strategy
+- Use mock files for 5GB testing to avoid actual large file creation
+- Simulate chunked upload behavior
+- Test memory efficiency with large datasets
+- Verify cleanup of temporary resources
+
+## Coverage Reports
+
+### Generating Reports
+```bash
+# Generate coverage report
+npm run test:coverage
+
+# View HTML report
+open coverage/index.html
+
+# View detailed file coverage
+npm run test:coverage -- --reporter=text-summary
+```
+
+### Coverage Targets
+- **Global minimum**: 80% across all metrics
+- **Critical services**: 85-90% coverage
+- **New file upload features**: 90%+ coverage
+- **Edge cases**: All boundary conditions tested
+
+## Known Limitations
+
+### Test Environment Limitations
+- Cannot test actual 5GB file uploads (use mocks)
+- Browser memory limitations in test environment
+- Network simulation limitations
+- File system access restrictions
+
+### Areas for Future Testing
+- Real-world network conditions
+- Browser-specific file handling differences
+- Mobile device constraints
+- Accessibility testing automation
+- Performance testing with real large files
+
+This comprehensive test suite ensures the reliability, performance, and maintainability of the Aivital application, with special attention to the new 5GB file upload capabilities while providing confidence in new feature development and refactoring efforts.

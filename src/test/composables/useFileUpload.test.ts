@@ -165,6 +165,26 @@ describe('useFileUpload', () => {
         })
       )
     })
+
+    it('should handle 5GB file upload', async () => {
+      // Arrange
+      const maxFile = createMockFile({
+        name: 'max-file.xml',
+        size: 5 * 1024 * 1024 * 1024 // 5GB
+      })
+      
+      const { uploadFile, isLargeFile } = useFileUpload()
+      const { chunkUploadService } = await import('@/services/chunkUploadService')
+      
+      ;(chunkUploadService.uploadFile as any).mockResolvedValue('uploaded-file-path')
+
+      // Act
+      const result = await uploadFile(maxFile)
+
+      // Assert
+      expect(result).toBe('uploaded-file-path')
+      expect(isLargeFile.value).toBe(true)
+    })
   })
 
   describe('cancelUpload', () => {
@@ -249,6 +269,30 @@ describe('useFileUpload', () => {
       expect(isLargeFile.value).toBe(false)
 
       progress.value.totalBytes = 150 * 1024 * 1024 // 150MB
+      expect(isLargeFile.value).toBe(true)
+    })
+  })
+
+  describe('Boundary Tests', () => {
+    it('should handle exactly 100MB file (large file threshold)', () => {
+      // Arrange
+      const { progress, isLargeFile } = useFileUpload()
+
+      // Act
+      progress.value.totalBytes = 100 * 1024 * 1024 // Exactly 100MB
+
+      // Assert
+      expect(isLargeFile.value).toBe(false) // Should be false at boundary
+    })
+
+    it('should handle 100MB + 1 byte file', () => {
+      // Arrange
+      const { progress, isLargeFile } = useFileUpload()
+
+      // Act
+      progress.value.totalBytes = 100 * 1024 * 1024 + 1 // Just over 100MB
+
+      // Assert
       expect(isLargeFile.value).toBe(true)
     })
   })

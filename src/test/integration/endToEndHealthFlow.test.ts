@@ -398,4 +398,47 @@ describe('End-to-End Health Data Flow', () => {
       expect(() => wrapper.unmount()).not.toThrow()
     })
   })
+
+  describe('Large File Processing Integration', () => {
+    it('should handle imported health data from large files', async () => {
+      // Arrange
+      const importedMetrics = Array.from({ length: 10000 }, (_, i) => ({
+        id: `imported-${i}`,
+        metric_type: 'heart_rate',
+        value: 60 + Math.random() * 40,
+        unit: 'bpm',
+        recorded_at: new Date(Date.now() - i * 3600000).toISOString(), // Hourly data
+        source: 'apple_health_import'
+      }))
+
+      mockSupabaseClient.from().select.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({
+            data: importedMetrics,
+            error: null
+          })
+        })
+      })
+
+      const wrapper = mount(HealthPage, {
+        global: {
+          plugins: [router, pinia]
+        }
+      })
+
+      // Act - Load imported metrics
+      await healthStore.fetchMetrics()
+      await wrapper.vm.$nextTick()
+
+      // Assert - Large dataset is handled efficiently
+      expect(healthStore.metrics).toHaveLength(10000)
+      expect(wrapper.exists()).toBe(true)
+      
+      // Performance check - component should still be responsive
+      const filterButton = wrapper.find('button:contains("Heart Rate")')
+      await filterButton.trigger('click')
+      
+      expect(wrapper.vm.selectedType).toBe('heart_rate')
+    })
+  })
 })

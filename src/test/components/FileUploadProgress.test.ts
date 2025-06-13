@@ -112,6 +112,23 @@ describe('FileUploadProgress', () => {
       // Assert
       expect(wrapper.text()).toContain('Chunk 3 of 5')
     })
+
+    it('should show 5GB file handling correctly', () => {
+      // Arrange & Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          progress: {
+            ...defaultProps.progress,
+            totalBytes: 5 * 1024 * 1024 * 1024 // 5GB
+          }
+        }
+      })
+
+      // Assert
+      expect(wrapper.text()).toContain('5.0 GB')
+      expect(wrapper.text()).toContain('Large file detected')
+    })
   })
 
   describe('Progress Bar', () => {
@@ -150,6 +167,40 @@ describe('FileUploadProgress', () => {
       const chunkProgressBar = wrapper.find('.bg-secondary-500')
       expect(chunkProgressBar.attributes('style')).toContain('width: 50%') // 2/4 = 50%
     })
+
+    it('should handle 0% progress', () => {
+      // Arrange & Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          progress: {
+            ...defaultProps.progress,
+            percentage: 0
+          }
+        }
+      })
+
+      // Assert
+      const progressBar = wrapper.find('.bg-primary-600')
+      expect(progressBar.attributes('style')).toContain('width: 0%')
+    })
+
+    it('should handle 100% progress', () => {
+      // Arrange & Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          progress: {
+            ...defaultProps.progress,
+            percentage: 100
+          }
+        }
+      })
+
+      // Assert
+      const progressBar = wrapper.find('.bg-primary-600')
+      expect(progressBar.attributes('style')).toContain('width: 100%')
+    })
   })
 
   describe('Error Handling', () => {
@@ -175,6 +226,19 @@ describe('FileUploadProgress', () => {
 
       // Assert
       expect(wrapper.text()).not.toContain('Upload Failed')
+    })
+
+    it('should handle 5GB file size error', () => {
+      // Arrange & Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          error: 'File size exceeds 5GB limit'
+        }
+      })
+
+      // Assert
+      expect(wrapper.text()).toContain('File size exceeds 5GB limit')
     })
   })
 
@@ -256,6 +320,7 @@ describe('FileUploadProgress', () => {
         { bytes: 1024, expected: '1.0 KB' },
         { bytes: 1024 * 1024, expected: '1.0 MB' },
         { bytes: 1024 * 1024 * 1024, expected: '1.0 GB' },
+        { bytes: 5 * 1024 * 1024 * 1024, expected: '5.0 GB' },
         { bytes: 0, expected: '0 B' }
       ]
 
@@ -299,6 +364,54 @@ describe('FileUploadProgress', () => {
       // Assert
       expect(wrapper.text()).toContain('50% complete')
       expect(wrapper.text()).toContain('5.0 MB / 10.0 MB')
+    })
+  })
+
+  describe('Edge Cases', () => {
+    it('should handle very large file names', () => {
+      // Arrange
+      const longFileName = 'a'.repeat(200) + '.xml'
+      
+      // Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          fileName: longFileName
+        }
+      })
+
+      // Assert
+      expect(wrapper.text()).toContain(longFileName)
+    })
+
+    it('should handle zero speed gracefully', () => {
+      // Arrange & Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          formattedSpeed: '0 B/s',
+          formattedETA: '--'
+        }
+      })
+
+      // Assert
+      expect(wrapper.text()).toContain('0 B/s')
+      expect(wrapper.text()).toContain('--')
+    })
+
+    it('should handle very high speeds', () => {
+      // Arrange & Act
+      const wrapper = mount(FileUploadProgress, {
+        props: {
+          ...defaultProps,
+          formattedSpeed: '1.2 GB/s',
+          formattedETA: '1s'
+        }
+      })
+
+      // Assert
+      expect(wrapper.text()).toContain('1.2 GB/s')
+      expect(wrapper.text()).toContain('1s')
     })
   })
 })
