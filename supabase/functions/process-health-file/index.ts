@@ -22,6 +22,7 @@
 */
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.43/deno-dom-wasm.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

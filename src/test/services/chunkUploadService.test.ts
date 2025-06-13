@@ -130,7 +130,7 @@ describe('ChunkUploadService', () => {
       })).rejects.toThrow('Failed to upload chunk 0 after 3 attempts')
     })
 
-    it('should calculate and verify MD5 checksums', async () => {
+    it('should calculate and verify SHA-256 checksums', async () => {
       // Arrange
       const mockArrayBuffer = new ArrayBuffer(16)
       const mockHashArray = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
@@ -147,7 +147,7 @@ describe('ChunkUploadService', () => {
       await service.uploadFile(userId, mockFile)
 
       // Assert
-      expect(global.crypto.subtle.digest).toHaveBeenCalledWith('MD5', expect.any(ArrayBuffer))
+      expect(global.crypto.subtle.digest).toHaveBeenCalledWith('SHA-256', expect.any(ArrayBuffer))
     })
 
     it('should handle upload timeout', async () => {

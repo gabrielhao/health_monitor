@@ -6,7 +6,7 @@
   1. Chunk Combination
     - Downloads all chunks for a session
     - Combines them in correct order
-    - Verifies MD5 checksum
+    - Verifies SHA-256 checksum
 
   2. File Processing
     - Calls process-health-file function for actual data processing
@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Verify checksum
-    const actualChecksum = await calculateMD5(combinedFile)
+    const actualChecksum = await calculateSHA256(combinedFile)
     if (actualChecksum !== expectedChecksum) {
       throw new Error(`Checksum mismatch. Expected: ${expectedChecksum}, Actual: ${actualChecksum}`)
     }
@@ -148,8 +148,8 @@ Deno.serve(async (req: Request) => {
   }
 })
 
-async function calculateMD5(data: Uint8Array): Promise<string> {
-  const hashBuffer = await crypto.subtle.digest('MD5', data)
+async function calculateSHA256(data: Uint8Array): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
