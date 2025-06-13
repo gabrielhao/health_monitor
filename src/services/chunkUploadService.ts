@@ -8,7 +8,7 @@ export interface ChunkUploadOptions {
   onChunkComplete?: (chunkIndex: number, totalChunks: number) => void
 }
 
-export interface UploadSession {
+interface UploadSession {
   id: string
   fileName: string
   fileSize: number
@@ -18,7 +18,7 @@ export interface UploadSession {
   createdAt: Date
 }
 
-export class ChunkUploadService {
+class ChunkUploadService {
   private static readonly DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
   private static readonly MAX_RETRIES = 3
   private static readonly TIMEOUT = 30000 // 30 seconds per chunk
@@ -44,8 +44,8 @@ export class ChunkUploadService {
       throw new Error('File size exceeds 5GB limit')
     }
 
-    // Calculate file checksum
-    const fileChecksum = await this.calculateMD5(file)
+    // Calculate file checksum using SHA-256
+    const fileChecksum = await this.calculateSHA256(file)
     
     // Create upload session
     const sessionId = this.generateSessionId()
@@ -160,7 +160,7 @@ export class ChunkUploadService {
     session: UploadSession,
     timeout: number
   ): Promise<void> {
-    const chunkChecksum = await this.calculateMD5(chunk)
+    const chunkChecksum = await this.calculateSHA256(chunk)
     const chunkPath = `${session.fileName}.chunk.${chunkIndex}`
     
     // Create timeout promise
@@ -224,9 +224,9 @@ export class ChunkUploadService {
     this.sessions.delete(session.id)
   }
 
-  private async calculateMD5(data: Blob): Promise<string> {
+  private async calculateSHA256(data: Blob): Promise<string> {
     const arrayBuffer = await data.arrayBuffer()
-    const hashBuffer = await crypto.subtle.digest('MD5', arrayBuffer)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
   }
@@ -248,3 +248,5 @@ export class ChunkUploadService {
 }
 
 export const chunkUploadService = new ChunkUploadService()
+
+export { ChunkUploadService }
