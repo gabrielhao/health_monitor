@@ -57,9 +57,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Fetch user profile
   const fetchProfile = async () => {
-    if (!user.value) return
+    if (!user.value) {
+      console.log('No user found, skipping profile fetch')
+      return
+    }
 
     try {
+      loading.value = true
+      console.log('Fetching profile for user:', user.value.id)
+      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -67,17 +73,32 @@ export const useAuthStore = defineStore('auth', () => {
         .maybeSingle()
 
       if (error) {
+        console.error('Error fetching profile:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
         if (error.message.includes('Failed to fetch')) {
           throw new Error('Unable to connect to the database. Please check your internet connection.')
         }
         throw error
       }
 
-      // Set profile to data (which will be null if no profile found)
+      if (!data) {
+        console.log('No profile found for user:', user.value.id)
+        profile.value = null
+        return
+      }
+
+      console.log('Profile fetched successfully:', data)
       profile.value = data
     } catch (error: any) {
       console.error('Error fetching profile:', error)
-      // Don't throw the error to prevent app crash
+      profile.value = null
+      throw error // Re-throw to allow caller to handle the error
+    } finally {
+      loading.value = false
     }
   }
 
@@ -198,6 +219,7 @@ export const useAuthStore = defineStore('auth', () => {
   // Create profile
   const createProfile = async (userId: string, profileData: Partial<UserProfile>) => {
     try {
+      console.log('Attempting to create profile for user:', userId, 'with data:', profileData)
       const { data, error } = await supabase
         .from('user_profiles')
         .insert({
@@ -208,12 +230,19 @@ export const useAuthStore = defineStore('auth', () => {
         .single()
 
       if (error) {
+        console.error('Profile creation failed with error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
         if (error.message.includes('Failed to fetch')) {
           throw new Error('Unable to connect to the database. Please check your internet connection.')
         }
         throw error
       }
 
+      console.log('Profile created successfully:', data)
       profile.value = data
       return data
     } catch (error) {
