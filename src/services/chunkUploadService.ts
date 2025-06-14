@@ -79,7 +79,7 @@ class ChunkUploadService {
       timeout = ChunkUploadService.TIMEOUT,
       onProgress,
       onChunkComplete,
-      documentId = this.generateSessionId(),
+      documentId = this.generateUUID(), // Use proper UUID generation
       metadata = {}
     } = options
 
@@ -428,6 +428,23 @@ class ChunkUploadService {
     
     await Promise.race([processPromise, timeoutPromise])
     console.log(`[ChunkUpload] Completed processing chunk ${chunkIndex}`)
+  }
+
+  /**
+   * Generates a proper UUID for document IDs
+   */
+  private generateUUID(): string {
+    // Use crypto.randomUUID() if available (modern browsers)
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+    
+    // Fallback UUID generation for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0
+      const v = c === 'x' ? r : (r & 0x3 | 0x8)
+      return v.toString(16)
+    })
   }
 
   private generateSessionId(): string {

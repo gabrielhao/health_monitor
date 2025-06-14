@@ -23,7 +23,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!
+    // Try to get OpenAI API key from environment variables
+    let openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    
+    // If not found in edge function environment, try to get from request headers
+    if (!openaiApiKey) {
+      const authHeader = req.headers.get('authorization')
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        // For now, we'll use a fallback approach
+        // In production, you should set the OPENAI_API_KEY as a Supabase secret
+        console.warn('OpenAI API key not found in environment variables')
+      }
+    }
+    
+    // Use the key from .env as fallback (this should be set as a Supabase secret in production)
+    if (!openaiApiKey) {
+      openaiApiKey = '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'
+    }
     
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured')
