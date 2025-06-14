@@ -27,7 +27,7 @@
               ref="fileInput"
               type="file"
               @change="handleFileSelect"
-              accept=".pdf,.docx,.txt,.csv,.json"
+              accept=".pdf,.docx,.txt,.csv,.json,.xml"
               multiple
               class="hidden"
             />
@@ -41,8 +41,8 @@
                 <span class="text-neutral-600"> or drag and drop</span>
               </div>
               <div class="text-sm text-neutral-500 space-y-1">
-                <p>Supports: PDF, DOCX, TXT, CSV, JSON</p>
-                <p>Max file size: 10MB | Max files: 50</p>
+                <p>Supports: PDF, DOCX, TXT, CSV, JSON, XML</p>
+                <p>Max file size: 1GB | Max files: 50</p>
               </div>
             </div>
           </div>

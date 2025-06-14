@@ -7,10 +7,12 @@ export class RAGService {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/plain',
     'text/csv',
-    'application/json'
+    'application/json',
+    'application/xml',
+    'text/xml'
   ]
 
-  private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+  private static readonly MAX_FILE_SIZE = 1024 * 1024 * 1024 // 1GB
   private static readonly MAX_FILES = 50
 
   static validateFiles(files: FileList): { valid: File[], invalid: { file: File, reason: string }[] } {
@@ -23,7 +25,7 @@ export class RAGService {
 
     Array.from(files).forEach(file => {
       if (file.size > this.MAX_FILE_SIZE) {
-        invalid.push({ file, reason: `File size exceeds 10MB limit` })
+        invalid.push({ file, reason: `File size exceeds 1GB limit` })
       } else if (!this.SUPPORTED_FORMATS.includes(file.type)) {
         invalid.push({ file, reason: `Unsupported file format: ${file.type}` })
       } else {
@@ -212,6 +214,9 @@ export class RAGService {
         return '📊'
       case 'application/json':
         return '🔧'
+      case 'application/xml':
+      case 'text/xml':
+        return '📋'
       default:
         return '📁'
     }
