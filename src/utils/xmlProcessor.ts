@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { XMLParser } from 'fast-xml-parser';
-import { pipeline } from '@xenova/transformers';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -9,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
  * Generate a simple but effective embedding using text characteristics
- * This serves as a fallback when the transformers.js model is unavailable
+ * This serves as a fallback when the edge function is unavailable
  * @param text - The text to generate embeddings for
  * @returns Array of embedding values (384 dimensions)
  */
@@ -82,136 +81,6 @@ function generateFallbackEmbedding(text: string): number[] {
   return normalizedEmbedding;
 }
 
-// Embedding pipeline management
-class EmbeddingPipelineManager {
-  private pipeline: any = null;
-  private initializationPromise: Promise<any> | null = null;
-  private initializationAttempts = 0;
-  private readonly MAX_ATTEMPTS = 3;
-  private readonly RETRY_DELAYS = [1000, 2000, 4000]; // ms
-  private fallbackMode = false;
-
-  constructor() {
-    // Start initialization immediately
-    this.initializationPromise = this.initializePipeline();
-  }
-
-  private async initializePipeline(): Promise<any> {
-    if (this.pipeline) {
-      return this.pipeline;
-    }
-
-    while (this.initializationAttempts < this.MAX_ATTEMPTS && !this.fallbackMode) {
-      try {
-        this.initializationAttempts++;
-        console.log(`[EMBEDDING_PIPELINE] Initializing pipeline... (attempt ${this.initializationAttempts}/${this.MAX_ATTEMPTS})`);
-
-        // Add delay for retry attempts
-        if (this.initializationAttempts > 1) {
-          const delay = this.RETRY_DELAYS[this.initializationAttempts - 2] || 4000;
-          console.log(`[EMBEDDING_PIPELINE] Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-
-        this.pipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-          revision: 'main',
-          cache_dir: './.cache',
-        });
-
-        console.log('[EMBEDDING_PIPELINE] Pipeline initialized successfully');
-        return this.pipeline;
-
-      } catch (error) {
-        console.error(`[EMBEDDING_PIPELINE] Initialization failed (attempt ${this.initializationAttempts}):`, error);
-        
-        if (this.initializationAttempts >= this.MAX_ATTEMPTS) {
-          console.warn('[EMBEDDING_PIPELINE] Max attempts reached. Switching to fallback mode.');
-          this.fallbackMode = true;
-          this.pipeline = 'FALLBACK_MODE'; // Special marker
-          return this.pipeline;
-        }
-      }
-    }
-
-    if (this.fallbackMode) {
-      this.pipeline = 'FALLBACK_MODE';
-      return this.pipeline;
-    }
-
-    throw new Error('Unexpected error in pipeline initialization');
-  }
-
-  public async getPipeline(): Promise<any> {
-    if (this.pipeline) {
-      return this.pipeline;
-    }
-
-    if (!this.initializationPromise) {
-      this.initializationPromise = this.initializePipeline();
-    }
-
-    return await this.initializationPromise;
-  }
-
-  public isInitialized(): boolean {
-    return this.pipeline !== null;
-  }
-
-  public isFallbackMode(): boolean {
-    return this.fallbackMode;
-  }
-
-  public getInitializationStatus(): string {
-    if (this.pipeline === 'FALLBACK_MODE') return 'fallback';
-    if (this.pipeline) return 'initialized';
-    if (this.initializationPromise) return 'initializing';
-    return 'not_started';
-  }
-}
-
-// Create a singleton instance
-const embeddingManager = new EmbeddingPipelineManager();
-
-/**
- * Initialize the embedding pipeline explicitly
- * Call this before processing large batches for better performance
- * @returns Promise that resolves when pipeline is ready
- */
-export async function initializeEmbeddingPipeline(): Promise<void> {
-  console.log('[EMBEDDING_PIPELINE] Explicitly initializing pipeline...');
-  try {
-    await embeddingManager.getPipeline();
-    console.log('[EMBEDDING_PIPELINE] Pipeline ready for use');
-  } catch (error) {
-    console.error('[EMBEDDING_PIPELINE] Failed to initialize pipeline:', error);
-    throw error;
-  }
-}
-
-/**
- * Check if the embedding pipeline is ready
- * @returns boolean indicating if pipeline is initialized
- */
-export function isEmbeddingPipelineReady(): boolean {
-  return embeddingManager.isInitialized();
-}
-
-/**
- * Check if the embedding pipeline is in fallback mode
- * @returns boolean indicating if using fallback embeddings
- */
-export function isEmbeddingPipelineInFallbackMode(): boolean {
-  return embeddingManager.isFallbackMode();
-}
-
-/**
- * Get the current status of the embedding pipeline
- * @returns Status string: 'initialized', 'initializing', 'fallback', or 'not_started'
- */
-export function getEmbeddingPipelineStatus(): string {
-  return embeddingManager.getInitializationStatus();
-}
-
 interface HealthData {
   id?: string;
   user_id: string;
@@ -282,7 +151,7 @@ export function formatRecordToString(record: AppleHealthRecord): string {
 }
 
 /**
- * Generate embeddings for the given text using transformers.js or fallback
+ * Generate embeddings for the given text using Supabase edge function
  * @param text - The text to generate embeddings for
  * @returns Array of embedding values
  */
@@ -295,7 +164,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     throw new Error('Cannot generate embedding for empty text');
   }
   
-  // Truncate text if it's too long (transformers.js has token limits)
+  // Truncate text if it's too long
   const maxLength = 512 * 4; // Roughly 512 tokens worth of characters
   const truncatedText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   
@@ -304,21 +173,21 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   }
   
   try {
-    const pipeline = await embeddingManager.getPipeline();
-    
-    // Check if we're in fallback mode
-    if (pipeline === 'FALLBACK_MODE' || embeddingManager.isFallbackMode()) {
-      console.log('[EMBEDDING_GENERATOR] Using fallback embedding generation');
-      return generateFallbackEmbedding(truncatedText);
-    }
-    
-    // Use the transformers.js pipeline
-    const result = await pipeline(truncatedText, {
-      pooling: 'mean',
-      normalize: true
+    // Call the Supabase edge function to generate embeddings
+    const { data, error } = await supabase.functions.invoke('generate-query-embedding', {
+      body: { text: truncatedText }
     });
     
-    const embedding = Array.from(result.data) as number[];
+    if (error) {
+      console.error('[EMBEDDING_GENERATOR] Edge function error:', error);
+      throw error;
+    }
+    
+    if (!data || !data.embedding) {
+      throw new Error('Invalid response from embedding service');
+    }
+    
+    const embedding = data.embedding as number[];
     console.debug('[EMBEDDING_GENERATOR] Generated embedding length:', embedding.length);
     console.log('[EMBEDDING_GENERATOR] Embedding generation completed successfully');
     return embedding;
@@ -326,7 +195,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   } catch (error) {
     console.error('[EMBEDDING_GENERATOR] Error generating embedding:', error);
     
-    // Fall back to simple embedding if transformers.js fails
+    // Fall back to simple embedding if edge function fails
     console.warn('[EMBEDDING_GENERATOR] Falling back to simple embedding generation');
     return generateFallbackEmbedding(truncatedText);
   }
@@ -384,17 +253,10 @@ export async function processAndStoreXML(
     userId,
     documentId,
     xmlLength: xmlString.length,
-    metadata,
-    pipelineStatus: getEmbeddingPipelineStatus()
+    metadata
   });
 
   try {
-    // Ensure pipeline is ready before processing
-    if (!isEmbeddingPipelineReady()) {
-      console.log('[XML_PROCESSOR] Pipeline not ready, initializing...');
-      await initializeEmbeddingPipeline();
-    }
-
     const parsedXML = await processXML(xmlString);
     console.log(`[XML_PROCESSOR] Processing ${parsedXML.Record.length} health records...`);
     console.debug('[XML_PROCESSOR] First record sample:', parsedXML.Record[0]);
@@ -432,7 +294,6 @@ export async function processAndStoreXML(
     return await storeHealthData(healthData);
   } catch (error) {
     console.error('[XML_PROCESSOR] Error in processAndStoreXML:', error);
-    console.error('[XML_PROCESSOR] Pipeline status at error:', getEmbeddingPipelineStatus());
     throw error;
   }
 }
@@ -454,10 +315,6 @@ export async function processBatchXMLChunks(
   console.log(`[XML_PROCESSOR] Starting batch processing of ${chunks.length} chunks...`);
   
   try {
-    // Initialize pipeline once for all chunks
-    console.log('[XML_PROCESSOR] Ensuring pipeline is ready for batch processing...');
-    await initializeEmbeddingPipeline();
-    
     const results: HealthData[] = [];
     
     for (let i = 0; i < chunks.length; i++) {
@@ -489,4 +346,35 @@ export async function processBatchXMLChunks(
     console.error('[XML_PROCESSOR] Error in batch processing:', error);
     throw error;
   }
-} 
+}
+
+// Legacy function exports for backward compatibility
+// These functions are no longer needed but kept to avoid breaking existing code
+
+/**
+ * @deprecated This function is no longer needed as embeddings are generated via edge function
+ */
+export async function initializeEmbeddingPipeline(): Promise<void> {
+  console.log('[EMBEDDING_PIPELINE] Pipeline initialization is now handled by edge function');
+}
+
+/**
+ * @deprecated This function is no longer needed as embeddings are generated via edge function
+ */
+export function isEmbeddingPipelineReady(): boolean {
+  return true; // Always ready since we use edge function
+}
+
+/**
+ * @deprecated This function is no longer needed as embeddings are generated via edge function
+ */
+export function isEmbeddingPipelineInFallbackMode(): boolean {
+  return false; // Edge function handles this internally
+}
+
+/**
+ * @deprecated This function is no longer needed as embeddings are generated via edge function
+ */
+export function getEmbeddingPipelineStatus(): string {
+  return 'initialized'; // Always initialized since we use edge function
+}
