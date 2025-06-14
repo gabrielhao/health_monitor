@@ -15,6 +15,8 @@ export interface UploadProgress {
 export function useFileUpload() {
   const authStore = useAuthStore()
   
+  console.log('[useFileUpload] Initializing file upload composable')
+  
   const uploading = ref(false)
   const progress = ref<UploadProgress>({
     percentage: 0,
@@ -39,7 +41,14 @@ export function useFileUpload() {
     file: File,
     options: Partial<ChunkUploadOptions> = {}
   ): Promise<string> => {
+    console.log('[useFileUpload] Starting file upload:', {
+      fileName: file.name,
+      fileSize: file.size,
+      options
+    })
+
     if (!authStore.user) {
+      console.error('[useFileUpload] Upload failed: User not authenticated')
       throw new Error('User not authenticated')
     }
 
@@ -63,24 +72,36 @@ export function useFileUpload() {
       const uploadOptions: ChunkUploadOptions = {
         ...options,
         onProgress: (percentage: number) => {
+          console.log('[useFileUpload] Upload progress:', {
+            percentage,
+            currentChunk: progress.value.currentChunk,
+            totalChunks: progress.value.totalChunks,
+            speed: progress.value.speed
+          })
           updateProgress(percentage, file.size)
           options.onProgress?.(percentage)
         },
         onChunkComplete: (chunkIndex: number, totalChunks: number) => {
+          console.log('[useFileUpload] Chunk completed:', {
+            chunkIndex,
+            totalChunks
+          })
           progress.value.currentChunk = chunkIndex + 1
           progress.value.totalChunks = totalChunks
           options.onChunkComplete?.(chunkIndex, totalChunks)
         }
       }
 
-      const filePath = await chunkUploadService.uploadFile(
+      const sessionId = await chunkUploadService.processXMLFile(
         file,
         authStore.user.id,
         uploadOptions
       )
 
-      return filePath
+      console.log('[useFileUpload] Upload completed successfully:', { sessionId })
+      return sessionId
     } catch (err: any) {
+      console.error('[useFileUpload] Upload failed:', err)
       error.value = err.message || 'Upload failed'
       throw err
     } finally {
@@ -118,12 +139,14 @@ export function useFileUpload() {
   }
 
   const cancelUpload = () => {
+    console.log('[useFileUpload] Cancelling upload')
     // Implementation would cancel ongoing upload
     uploading.value = false
     error.value = 'Upload cancelled by user'
   }
 
   const resetProgress = () => {
+    console.log('[useFileUpload] Resetting progress')
     progress.value = {
       percentage: 0,
       uploadedBytes: 0,
@@ -160,17 +183,16 @@ function formatBytes(bytes: number): string {
 }
 
 function formatTime(seconds: number): string {
-  if (seconds === 0 || !isFinite(seconds)) return '--'
+  if (seconds === 0) return '--'
   
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
+  const remainingSeconds = Math.floor(seconds % 60)
   
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${secs}s`
-  } else if (minutes > 0) {
-    return `${minutes}m ${secs}s`
-  } else {
-    return `${secs}s`
-  }
+  let result = ''
+  if (hours > 0) result += `${hours}h `
+  if (minutes > 0) result += `${minutes}m `
+  result += `${remainingSeconds}s`
+  
+  return result
 }
