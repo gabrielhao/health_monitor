@@ -145,7 +145,7 @@ export function formatRecordToString(record: AppleHealthRecord): string {
     .replace(/([A-Z])/g, ' $1')
     .trim();
   
-  const formattedString = `${formattedType}: "${value}" ${unit} recorded start at ${startDate} end at ${endDate} from source "${sourceName}"`;
+  const formattedString = `${formattedType}: ${value} ${unit} recorded start at ${startDate} end at ${endDate} from source ${sourceName}.`;
   console.debug('[RECORD_FORMATTER] Formatted record string:', formattedString);
   return formattedString;
 }
@@ -153,9 +153,9 @@ export function formatRecordToString(record: AppleHealthRecord): string {
 /**
  * Generate embeddings for the given text using Supabase edge function
  * @param text - The text to generate embeddings for
- * @returns Array of embedding values
+ * @returns Array of embedding arrays
  */
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(text: string): Promise<number[][]> {
   console.log('[EMBEDDING_GENERATOR] Generating embedding for text...');
   console.debug('[EMBEDDING_GENERATOR] Text length:', text.length, 'characters');
   console.debug('[EMBEDDING_GENERATOR] Text preview:', text.substring(0, 100) + '...');
@@ -174,8 +174,8 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   
   try {
     // Call the Supabase edge function to generate embeddings
-    const { data, error } = await supabase.functions.invoke('generate-query-embedding', {
-      body: { text: truncatedText }
+    const { data, error } = await supabase.functions.invoke('generate-embeddings', {
+      body: { content: truncatedText }
     });
     
     if (error) {
@@ -183,21 +183,28 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       throw error;
     }
     
-    if (!data || !data.embedding) {
+    if (!data || !Array.isArray(data.data) || data.data.length === 0) {
       throw new Error('Invalid response from embedding service');
     }
     
-    const embedding = data.embedding as number[];
-    console.debug('[EMBEDDING_GENERATOR] Generated embedding length:', embedding.length);
+    // Extract all embeddings from the response array
+    const embeddings = data.data.map((embeddingData: any) => {
+      if (!embeddingData || !embeddingData.embedding) {
+        throw new Error('Invalid embedding data in response');
+      }
+      return embeddingData.embedding as number[];
+    });
+    
+    console.debug('[EMBEDDING_GENERATOR] Generated embeddings count:', embeddings.length);
     console.log('[EMBEDDING_GENERATOR] Embedding generation completed successfully');
-    return embedding;
+    return embeddings;
     
   } catch (error) {
     console.error('[EMBEDDING_GENERATOR] Error generating embedding:', error);
     
     // Fall back to simple embedding if edge function fails
     console.warn('[EMBEDDING_GENERATOR] Falling back to simple embedding generation');
-    return generateFallbackEmbedding(truncatedText);
+    return [generateFallbackEmbedding(truncatedText)];
   }
 }
 
@@ -270,9 +277,13 @@ export async function processAndStoreXML(
     
     console.log('[XML_PROCESSOR] Generating embedding for processed content...');
     const startTime = Date.now();
-    const embedding = await generateEmbedding(content);
+    const embeddings = await generateEmbedding(content);
+    // Merge embeddings by averaging them element-wise
+    const embedding = embeddings[0].map((_, index) => 
+      embeddings.reduce((sum, emb) => sum + emb[index], 0) / embeddings.length
+    );
     const embeddingTime = Date.now() - startTime;
-    console.log(`[XML_PROCESSOR] Embedding generated in ${embeddingTime}ms`);
+    console.log(`[XML_PROCESSOR] Merged ${embeddings.length} embeddings into one in ${embeddingTime}ms`);
     
     // Store in database
     const healthData: HealthData = {
