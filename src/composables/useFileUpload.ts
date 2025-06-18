@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { chunkUploadService, type ChunkUploadOptions } from '@/services/chunkUploadService'
+import { supabase } from '@/services/supabase'
 import { useAuthStore } from '@/stores/auth'
 
 export interface UploadProgress {
@@ -39,7 +39,7 @@ export function useFileUpload() {
 
   const uploadFile = async (
     file: File,
-    options: Partial<ChunkUploadOptions> = {}
+    options: Partial<{ onProgress?: (percentage: number) => void; onChunkComplete?: (chunkIndex: number, totalChunks: number) => void }> = {}
   ): Promise<string> => {
     console.log('[useFileUpload] Starting file upload:', {
       fileName: file.name,
@@ -65,41 +65,77 @@ export function useFileUpload() {
       speed: 0,
       eta: 0,
       currentChunk: 0,
-      totalChunks: Math.ceil(file.size / (options.chunkSize || 5 * 1024 * 1024))
+      totalChunks: 1 // For Supabase storage, we treat it as a single chunk
     }
 
     try {
-      const uploadOptions: ChunkUploadOptions = {
-        ...options,
-        onProgress: (percentage: number) => {
-          console.log('[useFileUpload] Upload progress:', {
-            percentage,
-            currentChunk: progress.value.currentChunk,
-            totalChunks: progress.value.totalChunks,
-            speed: progress.value.speed
-          })
-          updateProgress(percentage, file.size)
-          options.onProgress?.(percentage)
-        },
-        onChunkComplete: (chunkIndex: number, totalChunks: number) => {
-          console.log('[useFileUpload] Chunk completed:', {
-            chunkIndex,
-            totalChunks
-          })
-          progress.value.currentChunk = chunkIndex + 1
-          progress.value.totalChunks = totalChunks
-          options.onChunkComplete?.(chunkIndex, totalChunks)
-        }
+      // Create a unique file path: userId/timestamp_filename
+      const timestamp = Date.now()
+      const filePath = `${authStore.user.id}/${timestamp}_${file.name}`
+
+      console.log('[useFileUpload] Uploading to Supabase storage:', { filePath })
+
+      // Upload file to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('health-files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error('[useFileUpload] Storage upload failed:', uploadError)
+        throw new Error(`Upload failed: ${uploadError.message}`)
       }
 
-      const sessionId = await chunkUploadService.processXMLFile(
-        file,
-        authStore.user.id,
-        uploadOptions
-      )
+      console.log('[useFileUpload] File uploaded to storage:', uploadData)
 
-      console.log('[useFileUpload] Upload completed successfully:', { sessionId })
-      return sessionId
+      // Update progress to 50% after upload
+      updateProgress(50, file.size)
+      options.onProgress?.(50)
+
+      // Get public URL for the uploaded file
+      const { data: publicUrlData } = supabase.storage
+        .from('health-files')
+        .getPublicUrl(filePath)
+
+      console.log('[useFileUpload] Generated public URL:', publicUrlData.publicUrl)
+
+      // Insert metadata into health_documents table
+      const { data: documentData, error: documentError } = await supabase
+        .from('health_documents')
+        .insert({
+          user_id: authStore.user.id,
+          title: file.name,
+          file_name: file.name,
+          file_type: file.type,
+          file_url: publicUrlData.publicUrl,
+          size_bytes: file.size,
+          uploaded_at: new Date().toISOString()
+        })
+        .select('id')
+        .single()
+
+      if (documentError) {
+        console.error('[useFileUpload] Database insert failed:', documentError)
+        // Clean up uploaded file if database insert fails
+        await supabase.storage.from('health-files').remove([filePath])
+        throw new Error(`Failed to save file metadata: ${documentError.message}`)
+      }
+
+      console.log('[useFileUpload] File metadata saved:', documentData)
+
+      // Update progress to 100%
+      updateProgress(100, file.size)
+      options.onProgress?.(100)
+      options.onChunkComplete?.(0, 1)
+
+      console.log('[useFileUpload] Upload completed successfully:', { 
+        documentId: documentData.id,
+        fileUrl: publicUrlData.publicUrl 
+      })
+
+      return documentData.id
     } catch (err: any) {
       console.error('[useFileUpload] Upload failed:', err)
       error.value = err.message || 'Upload failed'
