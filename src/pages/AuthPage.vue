@@ -77,9 +77,7 @@
     const authStore = useAuthStore();
     const signIn = async () => {
         try {
-            const result = await authStore.signUp('', '', {
-                full_name: '',
-            });
+            const result = await authStore.signUp();
 
             debugger;
 

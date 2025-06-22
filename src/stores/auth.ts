@@ -69,31 +69,10 @@ export const useAuthStore = defineStore('auth', () => {
     };
 
     // Sign up - allows users to self-register
-    const signUp = async (email: string, userData?: Partial<UserProfile>) => {
+    const signUp = async () => {
+        // If sign-up fails, try regular sign-in (External ID might handle new users during sign-in)
         try {
-            loading.value = true;
-
-            console.log('Starting sign-up process for email:', email);
-
-            // For Microsoft Entra External ID - try sign-up flow first
-            let authUser: any = null;
-
-            try {
-                authUser = await azureAuth.signUp(); // Try dedicated sign-up method
-            } catch (signUpError: any) {
-                console.log('Direct sign-up failed, trying regular sign-in flow:', signUpError.message);
-
-                // If sign-up fails, try regular sign-in (External ID might handle new users during sign-in)
-                try {
-                    authUser = await azureAuth.signIn();
-                } catch (signInError: any) {
-                    console.error('Both sign-up and sign-in failed:', {
-                        signUpError,
-                        signInError,
-                    });
-                    throw new Error(`Account creation failed. Error: ${signUpError.message}`);
-                }
-            }
+            const authUser = await azureAuth.signIn();
 
             if (authUser) {
                 user.value = authUser;
@@ -116,7 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
                 if (!profileExists || !profile.value) {
                     const profileData: Partial<UserProfile> = {
                         email: authUser.email,
-                        full_name: authUser.name || userData?.full_name || '',
+                        full_name: authUser.name || 'User',
                         privacy_settings: {
                             data_sharing: false,
                             analytics: true,
@@ -124,7 +103,6 @@ export const useAuthStore = defineStore('auth', () => {
                         },
                         medical_conditions: [],
                         medications: [],
-                        ...userData,
                     };
 
                     console.log('Creating new user profile in user_profile container with data:', profileData);
