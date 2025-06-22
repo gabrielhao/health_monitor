@@ -79,8 +79,6 @@
         try {
             const result = await authStore.signUp();
 
-            debugger;
-
             if (result.needsConfirmation) {
                 successMessage.value = 'Please check your email for a confirmation link.';
                 return;
