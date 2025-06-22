@@ -1,40 +1,41 @@
 import { vi } from 'vitest'
 import { config } from '@vue/test-utils'
+import { mockSupabaseClient } from './mocks/supabase'
 
 // Mock Supabase
 vi.mock('@/services/supabase', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn(),
-      getUser: vi.fn(),
-      signUp: vi.fn(),
-      signInWithPassword: vi.fn(),
-      signOut: vi.fn(),
-      resetPasswordForEmail: vi.fn(),
-      onAuthStateChange: vi.fn()
-    },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-      maybeSingle: vi.fn()
-    })),
-    storage: {
-      from: vi.fn(() => ({
-        upload: vi.fn(),
-        download: vi.fn(),
-        remove: vi.fn()
-      }))
-    },
-    functions: {
-      invoke: vi.fn()
-    }
+  supabase: mockSupabaseClient
+}))
+
+// Mock ChunkUploadService
+vi.mock('@/services/chunkUploadService', () => ({
+  chunkUploadService: {
+    uploadFile: vi.fn()
   }
+}))
+
+// Mock useFileUpload composable
+vi.mock('@/composables/useFileUpload', () => ({
+  useFileUpload: () => ({
+    uploading: { value: false },
+    progress: { 
+      value: {
+        percentage: 0,
+        uploadedBytes: 0,
+        totalBytes: 0,
+        speed: 0,
+        eta: 0,
+        currentChunk: 0,
+        totalChunks: 0
+      }
+    },
+    error: { value: '' },
+    formattedSpeed: { value: '0 B/s' },
+    formattedETA: { value: '--' },
+    uploadFile: vi.fn(),
+    cancelUpload: vi.fn(),
+    resetProgress: vi.fn()
+  })
 }))
 
 // Mock crypto.subtle for MD5 calculations

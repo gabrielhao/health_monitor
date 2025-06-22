@@ -134,6 +134,12 @@ export const useVectorStore = defineStore('vector', () => {
       return sources
     } catch (error) {
       console.error('Error fetching data sources:', error)
+      
+      // Provide more detailed error information
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Unable to connect to the database. Please check your internet connection and try again.')
+      }
+      
       throw error
     } finally {
       loading.value = false

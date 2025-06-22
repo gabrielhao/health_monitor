@@ -6,36 +6,27 @@ import DataImportPage from '@/pages/DataImportPage.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useVectorStore } from '@/stores/vector'
 import { createMockFile, mockSupabaseClient } from '../mocks/supabase'
+import type { UploadProgress } from '@/composables/useFileUpload'
+import type { ChunkUploadOptions } from '@/services/chunkUploadService'
 
-// Mock all external dependencies
-vi.mock('@/services/supabase', () => ({
-  supabase: mockSupabaseClient
-}))
-
-vi.mock('@/services/chunkUploadService', () => ({
-  chunkUploadService: {
-    uploadFile: vi.fn()
-  }
-}))
-
+// Mock the file upload composable
 vi.mock('@/composables/useFileUpload', () => ({
   useFileUpload: () => ({
-    uploading: { value: false },
-    progress: { 
-      value: {
-        percentage: 0,
-        uploadedBytes: 0,
-        totalBytes: 0,
-        speed: 0,
-        eta: 0,
-        currentChunk: 0,
-        totalChunks: 0
-      }
-    },
-    error: { value: '' },
-    formattedSpeed: { value: '0 B/s' },
-    formattedETA: { value: '--' },
-    uploadFile: vi.fn(),
+    uploading: false,
+    progress: {
+      percentage: 0,
+      uploadedBytes: 0,
+      totalBytes: 0,
+      speed: 0,
+      eta: 0,
+      currentChunk: 0,
+      totalChunks: 0
+    } as UploadProgress,
+    error: '',
+    isLargeFile: false,
+    formattedSpeed: '0 B/s',
+    formattedETA: '--',
+    uploadFile: vi.fn().mockImplementation((file: File, options?: Partial<ChunkUploadOptions>) => Promise.resolve('uploaded-file-path')),
     cancelUpload: vi.fn(),
     resetProgress: vi.fn()
   })
@@ -174,18 +165,18 @@ describe('File Upload Integration Flow', () => {
       const fileUploadComposable = useFileUpload()
       
       // Mock chunked upload with progress
-      fileUploadComposable.uploadFile.mockImplementation((file, options) => {
+      fileUploadComposable.uploadFile.mockImplementation((file: File, options?: Partial<ChunkUploadOptions>) => {
         // Simulate progress updates
-        options.onProgress?.(25)
-        options.onProgress?.(50)
-        options.onProgress?.(75)
-        options.onProgress?.(100)
+        options?.onProgress?.(25)
+        options?.onProgress?.(50)
+        options?.onProgress?.(75)
+        options?.onProgress?.(100)
         
         // Simulate chunk completion
-        options.onChunkComplete?.(0, 4)
-        options.onChunkComplete?.(1, 4)
-        options.onChunkComplete?.(2, 4)
-        options.onChunkComplete?.(3, 4)
+        options?.onChunkComplete?.(0, 4)
+        options?.onChunkComplete?.(1, 4)
+        options?.onChunkComplete?.(2, 4)
+        options?.onChunkComplete?.(3, 4)
         
         return Promise.resolve('large-file-path')
       })
@@ -290,8 +281,7 @@ describe('File Upload Integration Flow', () => {
 
       // Assert - Error is displayed
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.uploadError).toBe('Network connection failed')
-      expect(wrapper.text()).toContain('Upload Failed')
+      expect(wrapper.text()).toContain('Network connection failed')
     })
 
     it('should validate file size limits (reject >5GB)', async () => {

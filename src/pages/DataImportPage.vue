@@ -75,7 +75,7 @@
               />
               <CloudArrowUpIcon class="w-12 h-12 text-neutral-400 mx-auto mb-3" />
               <p class="text-neutral-600 mb-2">
-                <button @click="$refs.fileInput?.click()" class="text-primary-600 hover:text-primary-500">
+                <button @click="handleFileInputClick" class="text-primary-600 hover:text-primary-500">
                   Click to upload
                 </button>
                 or drag and drop
@@ -315,10 +315,10 @@
             <span :class="`px-2 py-1 rounded-full text-xs ${getStatusColor(session.status).badge}`">
               {{ session.status }}
             </span>
-            <button v-if="session.error_log.length > 0" @click="showErrors(session)" class="text-sm text-error-600 hover:text-error-500">
+            <button v-if="session.error_log.length > 0" @click="showErrors({...session, error_log: [...session.error_log]})" class="text-sm text-error-600 hover:text-error-500">
               View Errors
             </button>
-            <button @click="viewImportDetails(session)" class="text-sm text-primary-600 hover:text-primary-500">
+            <button @click="viewImportDetails({...session, error_log: [...session.error_log]})" class="text-sm text-primary-600 hover:text-primary-500">
               Details
             </button>
           </div>
@@ -439,7 +439,6 @@ import { useVectorStore } from '@/stores/vector'
 import { useRouter } from 'vue-router'
 import { useFileUpload } from '@/composables/useFileUpload'
 import { format } from 'date-fns'
-import { supabase } from '@/services/supabase'
 import FileUploadProgress from '@/components/shared/FileUploadProgress.vue'
 import {
   CloudArrowUpIcon,
@@ -585,41 +584,81 @@ const handleUpload = async () => {
   uploadErrorDetails.value = ''
 
   try {
-    // Upload file using chunked upload service
-    const filePath = await fileUpload.uploadFile(uploadForm.file, {
+    // Initialize current import with basic info
+    currentImport.value = {
+      id: '',
+      user_id: '',
+      source_app: uploadForm.source,
+      status: 'processing',
+      total_records: 0,
+      processed_records: 0,
+      failed_records: 0,
+      error_log: [],
+      metadata: {},
+      started_at: new Date().toISOString()
+    }
+
+    // Process XML file and store embeddings
+    const sessionId = await fileUpload.uploadFile(uploadForm.file, {
       chunkSize: uploadForm.chunkSize,
       onProgress: (progress) => {
-        console.log(`Upload progress: ${progress}%`)
+        console.log(`Processing progress: ${progress}%`)
+        // Update current import progress if available
+        if (currentImport.value) {
+          currentImport.value = {
+            ...currentImport.value,
+            processed_records: Math.round((progress / 100) * (currentImport.value.total_records || 1))
+          }
+        }
       },
       onChunkComplete: (chunkIndex, totalChunks) => {
-        console.log(`Chunk ${chunkIndex + 1}/${totalChunks} uploaded`)
-      }
-    })
-
-    console.log('File uploaded successfully:', filePath)
-
-    // Start server-side processing
-    const { data, error } = await supabase.functions.invoke('process-health-file', {
-      body: {
-        filePath,
-        source: uploadForm.source,
-        metadata: {
-          filename: uploadForm.file.name,
-          filesize: uploadForm.file.size,
-          filetype: uploadForm.file.type,
-          notes: uploadForm.notes,
-          uploaded_at: new Date().toISOString(),
-          chunk_size: uploadForm.chunkSize
+        console.log(`Chunk ${chunkIndex + 1}/${totalChunks} processed`)
+        // Update total records based on chunks if not set
+        if (currentImport.value && !currentImport.value.total_records) {
+          currentImport.value = {
+            ...currentImport.value,
+            total_records: totalChunks * 100 // Estimate 100 records per chunk
+          }
         }
       }
     })
 
-    if (error) {
-      throw new Error(`Processing failed: ${error.message}`)
+    console.log('File processed successfully:', sessionId)
+
+    // Start server-side processing
+    const payload = {
+      sessionId,
+      source: uploadForm.source,
+      metadata: {
+        filename: uploadForm.file.name,
+        filesize: uploadForm.file.size,
+        filetype: uploadForm.file.type,
+        notes: uploadForm.notes,
+        processed_at: new Date().toISOString(),
+        chunk_size: uploadForm.chunkSize,
+        total_chunks: currentImport.value?.total_records ? Math.ceil(currentImport.value.total_records / 100) : undefined
+      }
     }
 
+    const response = await fetch('/api/process-health-file', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Azure Function call failed: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+
     console.log('Processing completed:', data)
-    currentImport.value = data.importSession
+    currentImport.value = {
+      ...data.importSession,
+      error_log: [...data.importSession.error_log] // Convert readonly array to mutable
+    }
 
     // Reset form
     uploadForm.source = ''
@@ -631,9 +670,21 @@ const handleUpload = async () => {
     await vectorStore.fetchImportSessions()
 
   } catch (error: any) {
-    console.error('Upload/processing failed:', error)
-    uploadError.value = error.message || 'Upload failed. Please try again.'
+    console.error('Processing failed:', error)
+    uploadError.value = error.message || 'Processing failed. Please try again.'
     uploadErrorDetails.value = error.stack || error.toString()
+    
+    // Update current import status on error
+    if (currentImport.value) {
+      currentImport.value = {
+        ...currentImport.value,
+        status: 'failed',
+        error_log: [...(currentImport.value.error_log || []), {
+          error: error.message,
+          timestamp: new Date().toISOString()
+        }]
+      }
+    }
   }
 }
 
@@ -800,11 +851,17 @@ const formatDate = (dateString: string) => {
 }
 
 const showErrors = (session: ImportSession) => {
-  selectedSession.value = session
+  selectedSession.value = {
+    ...session,
+    error_log: [...session.error_log] // Convert readonly array to mutable
+  }
 }
 
 const viewImportDetails = (session: ImportSession) => {
-  detailsSession.value = session
+  detailsSession.value = {
+    ...session,
+    error_log: [...session.error_log] // Convert readonly array to mutable
+  }
 }
 
 const viewImportedDocuments = (session: ImportSession) => {
@@ -813,12 +870,21 @@ const viewImportedDocuments = (session: ImportSession) => {
   router.push(`/health?import=${session.id}`)
 }
 
+const handleFileInputClick = () => {
+  if (fileInput.value) {
+    fileInput.value.click()
+  }
+}
+
 // Watch for import progress updates
 watch(() => vectorStore.importSessions, (sessions) => {
   if (currentImport.value) {
     const updated = sessions.find(s => s.id === currentImport.value?.id)
     if (updated) {
-      currentImport.value = updated
+      currentImport.value = {
+        ...updated,
+        error_log: [...updated.error_log] // Convert readonly array to mutable
+      }
       
       // Clear current import when completed or failed
       if (updated.status === 'completed' || updated.status === 'failed') {

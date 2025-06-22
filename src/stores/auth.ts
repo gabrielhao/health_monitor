@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
-import { supabase } from '@/services/supabase'
-import type { User, UserProfile } from '@/types'
+import { azureAuth, type AuthUser } from '@/services/azureAuth'
+import { azureCosmos } from '@/services/azureCosmos'
+import type { UserProfile } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<User | null>(null)
+  const user = ref<AuthUser | null>(null)
   const profile = ref<UserProfile | null>(null)
   const loading = ref(false)
   const initialized = ref(false)
@@ -17,35 +18,17 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       loading.value = true
       
-      // Test connection first
-      const { data: connectionTest, error: connectionError } = await supabase
-        .from('user_profiles')
-        .select('count')
-        .limit(1)
-        .maybeSingle()
-
-      if (connectionError && connectionError.message.includes('Failed to fetch')) {
-        console.error('Supabase connection failed:', connectionError)
-        throw new Error('Unable to connect to the database. Please check your internet connection and try again.')
-      }
-
-      const { data: { session } } = await supabase.auth.getSession()
+      // Initialize Azure services
+      await azureAuth.initialize()
+      await azureCosmos.initialize()
       
-      if (session?.user) {
-        user.value = session.user as User
+      // Check if user is already authenticated
+      const currentUser = await azureAuth.getUser()
+      if (currentUser) {
+        user.value = currentUser
         await fetchProfile()
       }
       
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session?.user) {
-          user.value = session.user as User
-          await fetchProfile()
-        } else {
-          user.value = null
-          profile.value = null
-        }
-      })
     } catch (error: any) {
       console.error('Error initializing auth:', error)
       // Don't throw the error to prevent app crash, just log it
@@ -57,71 +40,116 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Fetch user profile
   const fetchProfile = async () => {
-    if (!user.value) return
+    if (!user.value) {
+      console.log('No user found, skipping profile fetch')
+      return
+    }
 
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', user.value.id)
-        .maybeSingle()
+      loading.value = true
+      console.log('Fetching profile for user:', user.value.id)
+      
+      // Query Azure Cosmos DB for user profile
+      const userProfile = await azureCosmos.getUserProfile(user.value.id)
 
-      if (error) {
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the database. Please check your internet connection.')
-        }
-        throw error
+      if (!userProfile) {
+        console.log('No profile found for user:', user.value.id)
+        profile.value = null
+        return
       }
 
-      // Set profile to data (which will be null if no profile found)
-      profile.value = data
+      console.log('Profile fetched successfully:', userProfile)
+      profile.value = userProfile
     } catch (error: any) {
       console.error('Error fetching profile:', error)
-      // Don't throw the error to prevent app crash
+      profile.value = null
+      throw error // Re-throw to allow caller to handle the error
+    } finally {
+      loading.value = false
     }
   }
 
-  // Sign up
+  // Sign up - allows users to self-register
   const signUp = async (email: string, password: string, userData?: Partial<UserProfile>) => {
     try {
       loading.value = true
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      })
-
-      if (error) {
-        // Provide more specific error messages for sign up
-        if (error.message.includes('already registered')) {
-          throw new Error('An account with this email already exists. Please sign in instead.')
+      console.log('Starting sign-up process for email:', email)
+      
+      // For Microsoft Entra External ID - try sign-up flow first
+      let authUser: any = null
+      
+      try {
+        authUser = await azureAuth.signUp() // Try dedicated sign-up method
+      } catch (signUpError: any) {
+        console.log('Direct sign-up failed, trying regular sign-in flow:', signUpError.message)
+        
+        // If sign-up fails, try regular sign-in (External ID might handle new users during sign-in)
+        try {
+          authUser = await azureAuth.signIn()
+        } catch (signInError: any) {
+          console.error('Both sign-up and sign-in failed:', { signUpError, signInError })
+          throw new Error(`Account creation failed. Error: ${signUpError.message}`)
         }
-        if (error.message.includes('password')) {
-          throw new Error('Password must be at least 6 characters long.')
-        }
-        if (error.message.includes('email')) {
-          throw new Error('Please enter a valid email address.')
-        }
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the server. Please check your internet connection and try again.')
-        }
-        throw new Error(error.message)
       }
-
-      // Create profile immediately after user is created, regardless of session status
-      if (data.user) {
-        await createProfile(data.user.id, { email, ...userData })
+      
+      if (authUser) {
+        user.value = authUser
+        console.log('User authenticated successfully:', authUser.email)
+        
+        // Always try to fetch existing profile first
+        let profileExists = false
+        try {
+          await fetchProfile()
+          if (profile.value) {
+            profileExists = true
+            console.log('Existing user profile found:', profile.value.email)
+          }
+        } catch (profileError) {
+          console.log('No existing profile found, will create new one')
+          profileExists = false
+        }
+        
+        // Create user profile if it doesn't exist
+        if (!profileExists || !profile.value) {
+          const profileData: Partial<UserProfile> = {
+            email: authUser.email,
+            full_name: authUser.name || userData?.full_name || '',
+            privacy_settings: {
+              data_sharing: false,
+              analytics: true,
+              notifications: true
+            },
+            medical_conditions: [],
+            medications: [],
+            ...userData
+          }
+          
+          console.log('Creating new user profile in user_profile container with data:', profileData)
+          
+          try {
+            await createProfile(authUser.id, profileData)
+            console.log('User profile created successfully in Cosmos DB')
+            
+            // Verify profile was created by fetching it again
+            await fetchProfile()
+            if (!profile.value) {
+              throw new Error('Profile creation verification failed')
+            }
+          } catch (createProfileError: any) {
+            console.error('Failed to create user profile:', createProfileError)
+            throw new Error(`User authenticated but profile creation failed: ${createProfileError.message}`)
+          }
+        } else {
+          console.log('Using existing user profile')
+        }
+        
+        return { user: authUser, profile: profile.value }
       }
-
-      // Check if email confirmation is required
-      if (data.user && !data.session) {
-        // Email confirmation required
-        return { needsConfirmation: true }
-      }
-
-      return { needsConfirmation: false }
+      
+      throw new Error('Failed to authenticate user')
     } catch (error: any) {
-      console.error('Error signing up:', error)
+      console.error('Error during sign up:', error)
       throw error
     } finally {
       loading.value = false
@@ -129,36 +157,25 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // Sign in
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email?: string, password?: string) => {
     try {
       loading.value = true
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (error) {
-        // Provide more helpful error messages for sign in
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('The email or password you entered is incorrect. Please check your credentials and try again.')
+      const authUser = await azureAuth.signIn()
+      if (authUser) {
+        user.value = authUser
+        await fetchProfile()
+        
+        // Create profile if it doesn't exist
+        if (!profile.value) {
+          await createProfile(authUser.id, { 
+            email: authUser.email,
+            full_name: authUser.name 
+          })
         }
-        if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please check your email and click the confirmation link before signing in.')
-        }
-        if (error.message.includes('Too many requests')) {
-          throw new Error('Too many sign-in attempts. Please wait a few minutes before trying again.')
-        }
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the server. Please check your internet connection and try again.')
-        }
-        throw new Error(error.message)
       }
-
-      user.value = data.user as User
-      await fetchProfile()
       
-      return data
+      return { user: authUser }
     } catch (error: any) {
       console.error('Error signing in:', error)
       throw error
@@ -172,24 +189,16 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       loading.value = true
       
-      const { error } = await supabase.auth.signOut()
+      await azureAuth.signOut()
+      user.value = null
+      profile.value = null
       
-      if (error) {
-        if (error.message.includes('Failed to fetch')) {
-          // If we can't connect to sign out, just clear local state
-          console.warn('Unable to connect to server for sign out, clearing local session')
-        } else {
-          throw error
-        }
-      }
-
-      user.value = null
-      profile.value = null
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error signing out:', error)
-      // Clear local state even if server sign out fails
+      // Clear local state even if sign out fails
       user.value = null
       profile.value = null
+      throw error
     } finally {
       loading.value = false
     }
@@ -198,54 +207,67 @@ export const useAuthStore = defineStore('auth', () => {
   // Create profile
   const createProfile = async (userId: string, profileData: Partial<UserProfile>) => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: userId,
-          ...profileData,
-        })
-        .select()
-        .single()
-
-      if (error) {
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the database. Please check your internet connection.')
-        }
-        throw error
+      loading.value = true
+      
+      console.log(`Creating user profile in user_profile container for user ID: ${userId}`)
+      
+      // Ensure all required fields are present
+      const completeProfileData = {
+        id: userId,
+        email: profileData.email || '',
+        full_name: profileData.full_name || '',
+        avatar_url: profileData.avatar_url,
+        date_of_birth: profileData.date_of_birth,
+        gender: profileData.gender,
+        height: profileData.height,
+        weight: profileData.weight,
+        emergency_contact: profileData.emergency_contact,
+        privacy_settings: {
+          data_sharing: false,
+          analytics: true,
+          notifications: true,
+          ...profileData.privacy_settings
+        },
+        medical_conditions: profileData.medical_conditions || [],
+        medications: profileData.medications || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        ...profileData
       }
 
-      profile.value = data
-      return data
-    } catch (error) {
-      console.error('Error creating profile:', error)
-      throw error
+      console.log('Complete profile data to be created:', completeProfileData)
+      
+      const newProfile = await azureCosmos.createUserProfile(completeProfileData)
+      
+      console.log('User profile created successfully in Cosmos DB user_profile container:', newProfile.id)
+      
+      profile.value = newProfile
+      return newProfile
+    } catch (error: any) {
+      console.error('Error creating profile in user_profile container:', error)
+      throw new Error(`Failed to create user profile: ${error.message}`)
+    } finally {
+      loading.value = false
     }
   }
 
   // Update profile
   const updateProfile = async (updates: Partial<UserProfile>) => {
-    if (!user.value) throw new Error('Not authenticated')
+    if (!user.value || !user.value.id) {
+      throw new Error('Not authenticated')
+    }
 
     try {
       loading.value = true
       
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .update(updates)
-        .eq('id', user.value.id)
-        .select()
-        .single()
+      const updatedProfile = await azureCosmos.updateUserProfile(
+        user.value.id,
+        updates
+      )
 
-      if (error) {
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the database. Please check your internet connection.')
-        }
-        throw error
-      }
-
-      profile.value = data
-      return data
-    } catch (error) {
+      profile.value = updatedProfile
+      return updatedProfile
+    } catch (error: any) {
       console.error('Error updating profile:', error)
       throw error
     } finally {
@@ -253,23 +275,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Reset password
+  // Reset password (handled by Azure AD)
   const resetPassword = async (email: string) => {
+    throw new Error('Password reset is handled through Azure Active Directory. Please use the Azure AD password reset flow.')
+  }
+
+  // Verify profile exists in user_profile container
+  const verifyProfileExists = async (userId: string): Promise<boolean> => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email)
-      
-      if (error) {
-        if (error.message.includes('email')) {
-          throw new Error('Please enter a valid email address.')
-        }
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the server. Please check your internet connection and try again.')
-        }
-        throw new Error(error.message)
-      }
+      console.log(`Verifying user profile exists in user_profile container for user ID: ${userId}`)
+      const existingProfile = await azureCosmos.getUserProfile(userId)
+      const exists = !!existingProfile
+      console.log(`Profile verification result: ${exists ? 'EXISTS' : 'NOT FOUND'}`)
+      return exists
     } catch (error: any) {
-      console.error('Error resetting password:', error)
-      throw error
+      console.error('Error verifying profile existence:', error)
+      return false
     }
   }
 
@@ -288,5 +309,6 @@ export const useAuthStore = defineStore('auth', () => {
     createProfile,
     updateProfile,
     resetPassword,
+    verifyProfileExists,
   }
 })

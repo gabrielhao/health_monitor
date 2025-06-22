@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
-import { chunkUploadService, type ChunkUploadOptions } from '@/services/chunkUploadService'
+import { azureBlob } from '@/services/azureBlob'
+import { azureCosmos } from '@/services/azureCosmos'
 import { useAuthStore } from '@/stores/auth'
 
 export interface UploadProgress {
@@ -14,6 +15,8 @@ export interface UploadProgress {
 
 export function useFileUpload() {
   const authStore = useAuthStore()
+  
+  console.log('[useFileUpload] Initializing file upload composable')
   
   const uploading = ref(false)
   const progress = ref<UploadProgress>({
@@ -37,9 +40,16 @@ export function useFileUpload() {
 
   const uploadFile = async (
     file: File,
-    options: Partial<ChunkUploadOptions> = {}
+    options: Partial<{ onProgress?: (percentage: number) => void; onChunkComplete?: (chunkIndex: number, totalChunks: number) => void }> = {}
   ): Promise<string> => {
+    console.log('[useFileUpload] Starting file upload:', {
+      fileName: file.name,
+      fileSize: file.size,
+      options
+    })
+
     if (!authStore.user) {
+      console.error('[useFileUpload] Upload failed: User not authenticated')
       throw new Error('User not authenticated')
     }
 
@@ -56,31 +66,58 @@ export function useFileUpload() {
       speed: 0,
       eta: 0,
       currentChunk: 0,
-      totalChunks: Math.ceil(file.size / (options.chunkSize || 5 * 1024 * 1024))
+      totalChunks: 1 // For Azure Blob storage, we treat it as a single chunk
     }
 
     try {
-      const uploadOptions: ChunkUploadOptions = {
-        ...options,
-        onProgress: (percentage: number) => {
+      // Create a unique file path: userId/timestamp_filename
+      const timestamp = Date.now()
+      const fileName = `${authStore.user.id}/${timestamp}_${file.name}`
+
+      console.log('[useFileUpload] Uploading to Azure Blob storage:', { fileName })
+
+      // Upload file to Azure Blob storage with progress tracking
+      const uploadResult = await azureBlob.uploadFile(fileName, file, 'health-files', {
+        onProgress: (bytesUploaded: number) => {
+          const percentage = (bytesUploaded / file.size) * 100
           updateProgress(percentage, file.size)
           options.onProgress?.(percentage)
-        },
-        onChunkComplete: (chunkIndex: number, totalChunks: number) => {
-          progress.value.currentChunk = chunkIndex + 1
-          progress.value.totalChunks = totalChunks
-          options.onChunkComplete?.(chunkIndex, totalChunks)
         }
-      }
+      })
 
-      const filePath = await chunkUploadService.uploadFile(
-        file,
-        authStore.user.id,
-        uploadOptions
-      )
+      console.log('[useFileUpload] File uploaded to storage:', uploadResult)
 
-      return filePath
+      // Update progress to 90% after upload
+      updateProgress(90, file.size)
+      options.onProgress?.(90)
+
+      // Insert metadata into Azure Cosmos DB
+      const documentData = await azureCosmos.createHealthDocument({
+        user_id: authStore.user.id,
+        title: file.name,
+        file_name: file.name,
+        file_type: file.type,
+        file_url: uploadResult.url,
+        size_bytes: file.size,
+        source_app: 'web-upload',
+        document_type: 'user-upload'
+      })
+
+      console.log('[useFileUpload] File metadata saved:', documentData)
+
+      // Update progress to 100%
+      updateProgress(100, file.size)
+      options.onProgress?.(100)
+      options.onChunkComplete?.(0, 1)
+
+      console.log('[useFileUpload] Upload completed successfully:', { 
+        documentId: documentData.id,
+        fileUrl: uploadResult.url 
+      })
+
+      return documentData.id
     } catch (err: any) {
+      console.error('[useFileUpload] Upload failed:', err)
       error.value = err.message || 'Upload failed'
       throw err
     } finally {
@@ -118,12 +155,14 @@ export function useFileUpload() {
   }
 
   const cancelUpload = () => {
+    console.log('[useFileUpload] Cancelling upload')
     // Implementation would cancel ongoing upload
     uploading.value = false
     error.value = 'Upload cancelled by user'
   }
 
   const resetProgress = () => {
+    console.log('[useFileUpload] Resetting progress')
     progress.value = {
       percentage: 0,
       uploadedBytes: 0,
@@ -150,27 +189,16 @@ export function useFileUpload() {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  
+  if (bytes === 0) return '0 Bytes'
   const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 function formatTime(seconds: number): string {
-  if (seconds === 0 || !isFinite(seconds)) return '--'
-  
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
-  
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${secs}s`
-  } else if (minutes > 0) {
-    return `${minutes}m ${secs}s`
-  } else {
-    return `${secs}s`
-  }
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.round(seconds % 60)
+  return `${minutes}m ${remainingSeconds}s`
 }
