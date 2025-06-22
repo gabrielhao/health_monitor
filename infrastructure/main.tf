@@ -1,9 +1,19 @@
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
+    }
+  }
+}
+
 provider "azurerm" {
   features {}
+  subscription_id = var.azure_subscription_id
 }
 
 resource "azurerm_resource_group" "main" {
-  name     = "healthmonitor-rg"
+  name     = "healthmonitor-${random_string.suffix.result}-rg"
   location = "West Europe"
 }
 
@@ -21,28 +31,25 @@ resource "random_string" "suffix" {
   special = false
 }
 
-resource "azurerm_app_service_plan" "main" {
+resource "azurerm_service_plan" "main" {
   name                = "healthmonitor-func-plan"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
-  kind                = "FunctionApp"
-  sku {
-    tier = "Dynamic"
-    size = "Y1"
-  }
+  os_type             = "Linux"
+  sku_name            = "Y1"
 }
-
-resource "azurerm_function_app" "main" {
+resource "azurerm_linux_function_app" "main" {
   name                       = "healthmonitor-funcapp"
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
-  app_service_plan_id        = azurerm_app_service_plan.main.id
   storage_account_name       = azurerm_storage_account.main.name
   storage_account_access_key = azurerm_storage_account.main.primary_access_key
-  version                    = "~4"
-  os_type                    = "linux"
+
+  service_plan_id           = azurerm_service_plan.main.id
 
   site_config {
-    linux_fx_version = "NODE|18"
+    application_stack {
+      node_version = "18"
+    }
   }
 }

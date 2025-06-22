@@ -26,3 +26,6 @@ dist-ssr
 
 .terraform
 .terraform.lock**
+
+*.tfstate
+*.tfstate.backup
