@@ -7,7 +7,8 @@ const router = createRouter({
     {
       path: '/',
       name: 'Home',
-      redirect: '/dashboard'
+      component: () => import('@/pages/HomePage.vue'),
+      meta: { requiresAuth: false }
     },
     {
       path: '/auth',
@@ -71,6 +72,10 @@ router.beforeEach(async (to) => {
   // Wait for auth to initialize
   if (!authStore.initialized) {
     await authStore.initialize()
+  }
+
+  if (to.name === 'Home') {
+    return true
   }
 
   // Check auth requirements

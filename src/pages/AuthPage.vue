@@ -1,4 +1,29 @@
 <template>
+  <div
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0068d7] to-[#4adc75] px-4 sm:px-6 lg:px-8"
+  >
+    <div class="max-w-md w-full">
+      <div class="text-center">
+        <div
+          class="w-36 h-36 mx-auto rounded-lg flex items-center justify-center"
+        >
+          <img
+            src="@/assets/AIvital_logo.png"
+            alt="Logo"
+            class="w-36 h-36 object-contain"
+          />
+        </div>
+        <h2 class="text-3xl font-bold text-neutral-900">
+          {{ isSignUp ? 'Create your account' : 'Sign in to your account' }}
+        </h2>
+        <p class="mt-2 text-sm text-neutral-600">
+          {{
+            isSignUp
+              ? 'Start monitoring your health today'
+              : 'Welcome back to Aivital'
+          }}
+        </p>
+      </div>
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 px-4 sm:px-6 lg:px-8">
         <div class="max-w-md w-full space-y-8">
             <div class="text-center">
