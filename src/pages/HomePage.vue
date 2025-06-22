@@ -48,21 +48,6 @@
       </div>
     </section>
 
-    <!-- Placeholder for login modal -->
-    <!-- <div
-      v-if="showLogin"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-    >
-      <div
-        class="bg-white p-6 rounded-xl w-full max-w-md shadow-lg text-center"
-      >
-        <h3 class="text-xl font-semibold mb-4">Sign In</h3>
-        <p class="text-neutral-500">Login form placeholder</p>
-        <button class="btn-secondary mt-6" @click="showLogin = false">
-          Close
-        </button>
-      </div>
-    </div> -->
   </div>
 </template>
 
