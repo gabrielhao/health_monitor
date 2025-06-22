@@ -90,33 +90,55 @@
         <h2 class="text-xl font-semibold text-neutral-900 mb-6">Processing Options</h2>
         
         <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-neutral-700 mb-2">
-              Chunk Size (tokens)
-            </label>
-            <select v-model="processingOptions.chunkSize" class="input-field">
-              <option :value="256">256 tokens (small chunks)</option>
-              <option :value="512">512 tokens (recommended)</option>
-              <option :value="1024">1024 tokens (large chunks)</option>
-            </select>
-            <p class="text-xs text-neutral-500 mt-1">
-              Smaller chunks provide more precise search, larger chunks preserve more context
+          <!-- Upload Method Toggle -->
+          <div class="p-4 border border-neutral-200 rounded-lg bg-neutral-50">
+            <div class="flex items-center space-x-3 mb-3">
+              <input 
+                id="uploadCompleteFile" 
+                v-model="processingOptions.uploadCompleteFile" 
+                type="checkbox" 
+                class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              />
+              <label for="uploadCompleteFile" class="text-sm font-medium text-neutral-700">
+                Upload complete file without chunking
+              </label>
+            </div>
+            <p class="text-xs text-neutral-500">
+              When enabled, the entire file will be uploaded as a single unit without breaking it into smaller chunks.
+              This is useful for preserving document structure but may reduce search precision.
             </p>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-neutral-700 mb-2">
-              Chunk Overlap (tokens)
-            </label>
-            <select v-model="processingOptions.chunkOverlap" class="input-field">
-              <option :value="0">No overlap</option>
-              <option :value="50">50 tokens</option>
-              <option :value="100">100 tokens (recommended)</option>
-              <option :value="200">200 tokens</option>
-            </select>
-            <p class="text-xs text-neutral-500 mt-1">
-              Overlap helps maintain context between chunks
-            </p>
+          <!-- Chunking Options (only show when not uploading complete file) -->
+          <div v-if="!processingOptions.uploadCompleteFile" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-neutral-700 mb-2">
+                Chunk Size (tokens)
+              </label>
+              <select v-model="processingOptions.chunkSize" class="input-field">
+                <option :value="256">256 tokens (small chunks)</option>
+                <option :value="512">512 tokens (recommended)</option>
+                <option :value="1024">1024 tokens (large chunks)</option>
+              </select>
+              <p class="text-xs text-neutral-500 mt-1">
+                Smaller chunks provide more precise search, larger chunks preserve more context
+              </p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-neutral-700 mb-2">
+                Chunk Overlap (tokens)
+              </label>
+              <select v-model="processingOptions.chunkOverlap" class="input-field">
+                <option :value="0">No overlap</option>
+                <option :value="50">50 tokens</option>
+                <option :value="100">100 tokens (recommended)</option>
+                <option :value="200">200 tokens</option>
+              </select>
+              <p class="text-xs text-neutral-500 mt-1">
+                Overlap helps maintain context between chunks
+              </p>
+            </div>
           </div>
 
           <div class="flex items-center space-x-3">
@@ -149,7 +171,7 @@
             class="btn-primary w-full"
           >
             <div v-if="ragStore.processing" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            Process {{ selectedFiles.length }} File{{ selectedFiles.length !== 1 ? 's' : '' }}
+            {{ processingOptions.uploadCompleteFile ? 'Upload' : 'Process' }} {{ selectedFiles.length }} File{{ selectedFiles.length !== 1 ? 's' : '' }}
           </button>
         </div>
       </div>
@@ -277,7 +299,8 @@
               <h3 class="font-medium text-neutral-900">{{ document.filename }}</h3>
               <div class="flex items-center space-x-4 text-sm text-neutral-500">
                 <span>{{ RAGService.formatFileSize(document.file_size) }}</span>
-                <span>{{ document.chunk_count }} chunks</span>
+                <span v-if="document.metadata?.upload_complete_file">Complete file</span>
+                <span v-else>{{ document.chunk_count }} chunks</span>
                 <span>{{ document.embedding_count }} embeddings</span>
                 <span>{{ formatDate(document.created_at) }}</span>
               </div>
@@ -368,7 +391,8 @@ const processingOptions = reactive<RAGProcessingOptions>({
   chunkSize: 512,
   chunkOverlap: 100,
   generateEmbeddings: true,
-  preserveFormatting: false
+  preserveFormatting: false,
+  uploadCompleteFile: false
 })
 
 const handleFileSelect = (event: Event) => {

@@ -17,6 +17,19 @@ export class RAGService {
   private static readonly MAX_FILE_SIZE = 1024 * 1024 * 1024 // 1GB
   private static readonly MAX_FILES = 50
 
+  // Helper function to safely convert date to ISO string
+  private static toISOString(date: Date | string | undefined): string | undefined {
+    if (!date) return undefined
+    if (typeof date === 'string') return date
+    return date.toISOString()
+  }
+
+  // Helper function to safely convert date to ISO string (required)
+  private static toRequiredISOString(date: Date | string): string {
+    if (typeof date === 'string') return date
+    return date.toISOString()
+  }
+
   static validateFiles(files: FileList): { valid: File[], invalid: { file: File, reason: string }[] } {
     const valid: File[] = []
     const invalid: { file: File, reason: string }[] = []
@@ -47,10 +60,17 @@ export class RAGService {
       total_chunks: 0,
       total_embeddings: 0,
       status: 'processing',
-      error_log: []
+      error_log: [],
+      _partitionKey: userId
     })
 
-    return session
+    // Convert RagImportSession to RAGImportSession
+    return {
+      ...session,
+      started_at: this.toRequiredISOString(session.started_at),
+      completed_at: this.toISOString(session.completed_at),
+      error_log: session.error_log || []
+    }
   }
 
   static async updateImportSession(
@@ -58,8 +78,21 @@ export class RAGService {
     userId: string,
     updates: Partial<RAGImportSession>
   ): Promise<RAGImportSession> {
-    const session = await azureCosmos.updateRagImportSession(sessionId, userId, updates)
-    return session
+    // Convert string dates to Date objects for the database
+    const dbUpdates: any = { ...updates }
+    if (updates.completed_at) {
+      dbUpdates.completed_at = new Date(updates.completed_at)
+    }
+    
+    const session = await azureCosmos.updateRagImportSession(sessionId, userId, dbUpdates)
+    
+    // Convert back to RAGImportSession format
+    return {
+      ...session,
+      started_at: this.toRequiredISOString(session.started_at),
+      completed_at: this.toISOString(session.completed_at),
+      error_log: session.error_log || []
+    }
   }
 
   static async uploadFile(file: File, userId: string): Promise<string> {
@@ -79,45 +112,192 @@ export class RAGService {
       // Upload file to Azure Blob Storage
       const filePath = await this.uploadFile(file, userId)
 
+      // Read file content
+      const fileContent = await this.readFileContent(file)
+
       // Create document record in Cosmos DB
       const document = await azureCosmos.createRagDocument({
         user_id: userId,
         filename: file.name,
         file_type: file.type,
         file_size: file.size,
-        content: '', // Will be updated after processing
+        content: options.uploadCompleteFile ? fileContent : '', // Store full content if uploading complete file
         status: 'processing',
-        chunk_count: 0,
+        chunk_count: options.uploadCompleteFile ? 1 : 0, // Complete file counts as 1 chunk
         embedding_count: 0,
         metadata: {
           file_path: filePath,
           session_id: sessionId,
-          processing_options: options
+          processing_options: options,
+          upload_complete_file: options.uploadCompleteFile
+        },
+        _partitionKey: userId
+      })
+
+      // If uploading complete file, create a single chunk with the entire content
+      if (options.uploadCompleteFile) {
+        // Create single chunk for the entire file
+        const chunk = await azureCosmos.createRagChunk({
+          document_id: document.id,
+          user_id: userId,
+          content: fileContent,
+          embedding: [], // Will be populated if embeddings are generated
+          chunk_index: 0,
+          token_count: this.estimateTokenCount(fileContent),
+          metadata: {
+            is_complete_file: true,
+            file_name: file.name,
+            file_type: file.type
+          },
+          _partitionKey: userId
+        })
+
+        // Generate embedding for the complete file if requested
+        if (options.generateEmbeddings) {
+          try {
+            const embedding = await azureEmbedding.generateSingleEmbedding(fileContent)
+            
+            // Since there's no update method, we'll delete and recreate the chunk with embedding
+            await azureCosmos.deleteRagChunksByDocument(document.id, userId)
+            
+            const updatedChunk = await azureCosmos.createRagChunk({
+              document_id: document.id,
+              user_id: userId,
+              content: fileContent,
+              embedding: embedding,
+              chunk_index: 0,
+              token_count: this.estimateTokenCount(fileContent),
+              metadata: {
+                is_complete_file: true,
+                file_name: file.name,
+                file_type: file.type
+              },
+              _partitionKey: userId
+            })
+
+            // Update document embedding count
+            await azureCosmos.updateRagDocument(document.id, userId, {
+              embedding_count: 1,
+              status: 'completed'
+            })
+          } catch (embeddingError) {
+            console.error('Error generating embedding for complete file:', embeddingError)
+            // Update document with error status
+            await azureCosmos.updateRagDocument(document.id, userId, {
+              status: 'failed',
+              error_message: `Embedding generation failed: ${embeddingError instanceof Error ? embeddingError.message : 'Unknown error'}`
+            })
+          }
+        } else {
+          // Mark as completed without embeddings
+          await azureCosmos.updateRagDocument(document.id, userId, {
+            status: 'completed'
+          })
         }
-      })
 
-      // Process document via Azure Function
-      const processResult = await this.callAzureFunction('process-rag-document', {
-        documentId: document.id,
-        filePath,
-        options
-      })
+        // Convert RagDocument to RAGDocument
+        return {
+          ...document,
+          created_at: this.toRequiredISOString(document.created_at),
+          updated_at: this.toRequiredISOString(document.updated_at),
+          metadata: document.metadata || {}
+        }
+      }
 
-      return processResult.document
+      // Original chunked processing logic
+      // NEW: Try to trigger processing via backend service if available
+      try {
+        const { nodeFileUploadService } = await import('./nodeFileUploadService')
+        await nodeFileUploadService.processRAGDocument(document.id, userId, {
+          batchSize: options.chunkSize || 512,
+          transformOptions: options
+        })
+        console.log('Successfully triggered backend processing for document:', document.id)
+      } catch (backendError) {
+        console.warn('Backend processing not available, falling back to Azure Function:', backendError)
+        
+        // Fallback: Process document via Azure Function
+        const processResult = await this.callAzureFunction('process-rag-document', {
+          documentId: document.id,
+          filePath,
+          options
+        })
+        
+        return processResult.document
+      }
+
+      // Convert RagDocument to RAGDocument
+      return {
+        ...document,
+        created_at: this.toRequiredISOString(document.created_at),
+        updated_at: this.toRequiredISOString(document.updated_at),
+        metadata: document.metadata || {}
+      }
     } catch (error) {
       console.error('Document processing failed:', error)
       throw error
     }
   }
 
+  private static async readFileContent(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      
+      reader.onload = (event) => {
+        const result = event.target?.result
+        if (typeof result === 'string') {
+          resolve(result)
+        } else {
+          // Handle binary files by converting to base64
+          const arrayBuffer = result as ArrayBuffer
+          const uint8Array = new Uint8Array(arrayBuffer)
+          const binaryString = Array.from(uint8Array)
+            .map(byte => String.fromCharCode(byte))
+            .join('')
+          resolve(btoa(binaryString))
+        }
+      }
+      
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      
+      // Try to read as text first, fallback to binary
+      if (file.type.startsWith('text/') || 
+          file.type === 'application/json' || 
+          file.type === 'application/xml') {
+        reader.readAsText(file)
+      } else {
+        reader.readAsArrayBuffer(file)
+      }
+    })
+  }
+
+  private static estimateTokenCount(text: string): number {
+    // Simple token estimation (roughly 4 characters per token)
+    return Math.ceil(text.length / 4)
+  }
+
   static async getDocuments(userId: string, limit = 50): Promise<RAGDocument[]> {
     const documents = await azureCosmos.getRagDocuments(userId, { limit })
-    return documents || []
+    
+    // Convert RagDocument[] to RAGDocument[]
+    return (documents || []).map(doc => ({
+      ...doc,
+      created_at: this.toRequiredISOString(doc.created_at),
+      updated_at: this.toRequiredISOString(doc.updated_at),
+      metadata: doc.metadata || {}
+    }))
   }
 
   static async getImportSessions(userId: string): Promise<RAGImportSession[]> {
     const sessions = await azureCosmos.getRagImportSessions(userId)
-    return sessions || []
+    
+    // Convert RagImportSession[] to RAGImportSession[]
+    return (sessions || []).map(session => ({
+      ...session,
+      started_at: this.toRequiredISOString(session.started_at),
+      completed_at: this.toISOString(session.completed_at),
+      error_log: session.error_log || []
+    }))
   }
 
   static async searchSimilarChunks(
@@ -138,7 +318,13 @@ export class RAGService {
       }
     )
 
-    return similarChunks || []
+    // Convert RagChunk[] to RAGChunk[]
+    return (similarChunks || []).map(chunk => ({
+      ...chunk,
+      embedding: chunk.embedding || [],
+      created_at: this.toRequiredISOString(chunk.created_at),
+      metadata: chunk.metadata || {}
+    }))
   }
 
   static async deleteDocument(documentId: string, userId: string): Promise<void> {

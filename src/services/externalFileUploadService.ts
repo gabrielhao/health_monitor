@@ -58,12 +58,12 @@ export interface BatchApiResponse {
 class ExternalFileUploadService {
   private readonly baseUrl: string
   private readonly apiKey: string
-  private readonly defaultTimeout: number = 30000 // 30 seconds
+  private readonly defaultTimeout: number = 300000 // 5 minutes
   private readonly defaultChunkSize: number = 5 * 1024 * 1024 // 5MB
   private readonly maxRetries: number = 3
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_EXTERNAL_UPLOAD_API_URL || 'https://api.example.com'
+    this.baseUrl = import.meta.env.VITE_EXTERNAL_UPLOAD_API_URL || ''
     this.apiKey = import.meta.env.VITE_EXTERNAL_UPLOAD_API_KEY || ''
     
     if (!this.baseUrl) {
@@ -90,8 +90,6 @@ class ExternalFileUploadService {
       contentType = file.type,
       metadata = {},
       onProgress,
-      onChunkComplete,
-      chunkSize = this.defaultChunkSize,
       maxRetries = this.maxRetries,
       timeout = this.defaultTimeout
     } = options
@@ -103,117 +101,13 @@ class ExternalFileUploadService {
     const timestamp = Date.now()
     const fileName = path || `${userId}/${timestamp}-${file.name}`
 
-    // Check if file should be uploaded in chunks
-    const shouldChunk = file.size > chunkSize
-    
-    if (shouldChunk) {
-      return this.uploadFileInChunks(file, fileName, userId, {
-        ...options,
-        chunkSize,
-        maxRetries,
-        timeout
-      })
-    } else {
-      return this.uploadFileDirect(file, fileName, userId, {
+
+    return this.uploadFileDirect(file, fileName, userId, {
         ...options,
         maxRetries,
         timeout
       })
-    }
-  }
 
-  /**
-   * Upload multiple files in batch
-   */
-  async uploadBatch(
-    files: File[],
-    userId: string,
-    options: UploadOptions = {}
-  ): Promise<BatchUploadResult> {
-    console.log(`[ExternalUpload] Starting batch upload for ${files.length} files`)
-    
-    if (files.length === 0) {
-      throw new Error('No files provided for batch upload')
-    }
-
-    if (files.length > 50) {
-      throw new Error('Batch upload limited to 50 files maximum')
-    }
-
-    // Validate all files first
-    files.forEach(file => this.validateFile(file))
-
-    const formData = new FormData()
-    const fileMetadata: Array<{ name: string; size: number; type: string }> = []
-
-    // Add files to form data
-    files.forEach((file, index) => {
-      const timestamp = Date.now()
-      const fileName = `${userId}/${timestamp}-${index}-${file.name}`
-      
-      formData.append('files', file, fileName)
-      fileMetadata.push({
-        name: fileName,
-        size: file.size,
-        type: file.type
-      })
-    })
-
-    // Add metadata
-    formData.append('userId', userId)
-    formData.append('metadata', JSON.stringify({
-      ...options.metadata,
-      fileCount: files.length,
-      uploadType: 'batch',
-      timestamp: Date.now()
-    }))
-
-    try {
-      const response = await this.makeRequest('/upload/batch', {
-        method: 'POST',
-        body: formData,
-        timeout: options.timeout || this.defaultTimeout * files.length
-      })
-
-      const result: BatchApiResponse = await response.json()
-
-      if (!result.success || !result.data) {
-        throw new Error(result.error || 'Batch upload failed')
-      }
-
-      const successful: UploadResult[] = result.data.uploads.map(upload => ({
-        path: upload.path,
-        url: upload.url,
-        size: upload.size,
-        id: upload.id,
-        metadata: upload.metadata
-      }))
-
-      return {
-        successful,
-        failed: [],
-        totalFiles: files.length,
-        successCount: successful.length,
-        failureCount: 0
-      }
-
-    } catch (error) {
-      console.error('[ExternalUpload] Batch upload failed:', error)
-      
-      // Return all files as failed
-      const failed = files.map(file => ({
-        file,
-        error: error instanceof Error ? error.message : 'Upload failed'
-      }))
-
-      return {
-        successful: [],
-        failed,
-        totalFiles: files.length,
-        successCount: 0,
-        failureCount: files.length
-      }
-    }
   }
 
   /**
@@ -232,7 +126,7 @@ class ExternalFileUploadService {
       ...options.metadata,
       originalName: file.name,
       uploadType: 'direct',
-      timestamp: Date.now()
+      timestamp: Date.now().toString()
     }))
 
     // Track progress for direct upload
@@ -255,7 +149,7 @@ class ExternalFileUploadService {
     }
 
     try {
-      const response = await this.makeRequestWithProgress('/upload', {
+      const response = await this.makeRequestWithProgress('', {
         method: 'POST',
         body: formData,
         timeout: options.timeout || this.defaultTimeout
@@ -282,186 +176,6 @@ class ExternalFileUploadService {
     } catch (error) {
       console.error('[ExternalUpload] Direct upload failed:', error)
       throw error
-    }
-  }
-
-  /**
-   * Upload file in chunks (for larger files)
-   */
-  private async uploadFileInChunks(
-    file: File,
-    fileName: string,
-    userId: string,
-    options: UploadOptions
-  ): Promise<UploadResult> {
-    const chunkSize = options.chunkSize || this.defaultChunkSize
-    const totalChunks = Math.ceil(file.size / chunkSize)
-    
-    console.log(`[ExternalUpload] Uploading ${file.name} in ${totalChunks} chunks`)
-
-    // Initialize chunked upload session
-    const sessionId = await this.initializeChunkedUpload(file, fileName, userId, totalChunks)
-    
-    try {
-      // Upload chunks
-      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-        const start = chunkIndex * chunkSize
-        const end = Math.min(start + chunkSize, file.size)
-        const chunk = file.slice(start, end)
-        
-        await this.uploadChunk(sessionId, chunkIndex, chunk, options.maxRetries || this.maxRetries)
-        
-        // Update progress
-        const uploadedBytes = end
-        const percentage = (uploadedBytes / file.size) * 100
-        
-        options.onProgress?.({
-          percentage,
-          uploadedBytes,
-          totalBytes: file.size,
-          speed: 0, // Will be calculated by the composable
-          eta: 0,   // Will be calculated by the composable
-          currentChunk: chunkIndex + 1,
-          totalChunks
-        })
-        
-        options.onChunkComplete?.(chunkIndex, totalChunks)
-      }
-
-      // Finalize upload
-      const result = await this.finalizeChunkedUpload(sessionId)
-      
-      console.log(`[ExternalUpload] Chunked upload completed for ${file.name}`)
-      return result
-
-    } catch (error) {
-      // Cleanup failed upload
-      await this.cleanupChunkedUpload(sessionId)
-      throw error
-    }
-  }
-
-  /**
-   * Initialize a chunked upload session
-   */
-  private async initializeChunkedUpload(
-    file: File,
-    fileName: string,
-    userId: string,
-    totalChunks: number
-  ): Promise<string> {
-    const response = await this.makeRequest('/upload/chunked/init', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fileName,
-        fileSize: file.size,
-        fileType: file.type,
-        userId,
-        totalChunks,
-        chunkSize: this.defaultChunkSize
-      })
-    })
-
-    const result = await response.json()
-    
-    if (!result.success || !result.data?.sessionId) {
-      throw new Error(result.error || 'Failed to initialize chunked upload')
-    }
-
-    return result.data.sessionId
-  }
-
-  /**
-   * Upload a single chunk
-   */
-  private async uploadChunk(
-    sessionId: string,
-    chunkIndex: number,
-    chunk: Blob,
-    maxRetries: number
-  ): Promise<void> {
-    let lastError: Error | null = null
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const formData = new FormData()
-        formData.append('sessionId', sessionId)
-        formData.append('chunkIndex', chunkIndex.toString())
-        formData.append('chunk', chunk)
-
-        const response = await this.makeRequest('/upload/chunked/chunk', {
-          method: 'POST',
-          body: formData,
-          timeout: this.defaultTimeout
-        })
-
-        const result = await response.json()
-        
-        if (!result.success) {
-          throw new Error(result.error || 'Chunk upload failed')
-        }
-
-        return // Success
-
-      } catch (error) {
-        lastError = error as Error
-        console.warn(`[ExternalUpload] Chunk ${chunkIndex} upload attempt ${attempt + 1} failed:`, error)
-        
-        if (attempt < maxRetries) {
-          // Exponential backoff
-          const delay = Math.pow(2, attempt) * 1000
-          await new Promise(resolve => setTimeout(resolve, delay))
-        }
-      }
-    }
-
-    throw new Error(`Failed to upload chunk ${chunkIndex} after ${maxRetries + 1} attempts: ${lastError?.message}`)
-  }
-
-  /**
-   * Finalize chunked upload
-   */
-  private async finalizeChunkedUpload(sessionId: string): Promise<UploadResult> {
-    const response = await this.makeRequest('/upload/chunked/finalize', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ sessionId })
-    })
-
-    const result: ApiResponse = await response.json()
-    
-    if (!result.success || !result.data) {
-      throw new Error(result.error || 'Failed to finalize upload')
-    }
-
-    return {
-      path: result.data.path,
-      url: result.data.url,
-      size: result.data.size,
-      id: result.data.id,
-      metadata: result.data.metadata
-    }
-  }
-
-  /**
-   * Cleanup failed chunked upload
-   */
-  private async cleanupChunkedUpload(sessionId: string): Promise<void> {
-    try {
-      await this.makeRequest('/upload/chunked/cleanup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ sessionId })
-      })
-    } catch (error) {
-      console.warn('[ExternalUpload] Failed to cleanup upload session:', error)
     }
   }
 

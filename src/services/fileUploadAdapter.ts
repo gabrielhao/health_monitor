@@ -1,16 +1,17 @@
 import { externalFileUploadService } from './externalFileUploadService'
 import { azureBlob } from './azureBlob'
+import { nodeFileUploadService } from './nodeFileUploadService'
 import type { UploadOptions, UploadResult, BatchUploadResult } from './externalFileUploadService'
 
 /**
  * File Upload Adapter
  * 
  * This adapter provides a unified interface for file uploads that can switch
- * between different upload services (Azure Blob Storage, External API, etc.)
+ * between different upload services (Azure Blob Storage, External API, Node.js Service)
  * based on configuration or runtime conditions.
  */
 
-export type UploadProvider = 'azure' | 'external'
+export type UploadProvider = 'azure' | 'external' | 'node'
 
 export interface AdapterOptions extends UploadOptions {
   provider?: UploadProvider
@@ -76,6 +77,8 @@ class FileUploadAdapter {
     
     if (provider === 'external') {
       return await externalFileUploadService.uploadBatch(files, userId, options)
+    } else if (provider === 'node') {
+      return await nodeFileUploadService.uploadBatch(files, userId, options)
     } else {
       // For Azure, we'll upload files individually since it doesn't have native batch support
       return await this.uploadBatchIndividually(files, userId, options)
@@ -95,6 +98,9 @@ class FileUploadAdapter {
     switch (provider) {
       case 'external':
         return await externalFileUploadService.uploadFile(file, userId, path, options)
+      
+      case 'node':
+        return await nodeFileUploadService.uploadFile(file, userId, path, options)
       
       case 'azure':
         // Adapt Azure Blob Storage to match our interface
@@ -159,7 +165,7 @@ class FileUploadAdapter {
   }
 
   /**
-   * Get upload status (only supported by external provider)
+   * Get upload status (supported by external and node providers)
    */
   async getUploadStatus(uploadId: string, provider?: UploadProvider): Promise<{
     status: 'pending' | 'uploading' | 'completed' | 'failed'
@@ -170,19 +176,23 @@ class FileUploadAdapter {
     
     if (targetProvider === 'external') {
       return await externalFileUploadService.getUploadStatus(uploadId)
+    } else if (targetProvider === 'node') {
+      return await nodeFileUploadService.getUploadStatus(uploadId)
     } else {
       throw new Error(`Upload status tracking not supported by provider: ${targetProvider}`)
     }
   }
 
   /**
-   * Cancel an ongoing upload (only supported by external provider)
+   * Cancel an ongoing upload (supported by external and node providers)
    */
   async cancelUpload(uploadId: string, provider?: UploadProvider): Promise<void> {
     const targetProvider = provider || this.defaultProvider
     
     if (targetProvider === 'external') {
       return await externalFileUploadService.cancelUpload(uploadId)
+    } else if (targetProvider === 'node') {
+      return await nodeFileUploadService.cancelUpload(uploadId)
     } else {
       throw new Error(`Upload cancellation not supported by provider: ${targetProvider}`)
     }
@@ -196,6 +206,8 @@ class FileUploadAdapter {
     
     if (targetProvider === 'external') {
       return await externalFileUploadService.deleteFile(fileId)
+    } else if (targetProvider === 'node') {
+      return await nodeFileUploadService.deleteFile(fileId)
     } else if (targetProvider === 'azure') {
       return await azureBlob.deleteFile(fileId)
     } else {
@@ -211,6 +223,8 @@ class FileUploadAdapter {
     
     if (targetProvider === 'external') {
       return await externalFileUploadService.getFileMetadata(fileId)
+    } else if (targetProvider === 'node') {
+      return await nodeFileUploadService.getFileMetadata(fileId)
     } else if (targetProvider === 'azure') {
       return await azureBlob.getFileMetadata(fileId)
     } else {
@@ -219,11 +233,11 @@ class FileUploadAdapter {
   }
 
   /**
-   * Switch the default provider at runtime
+   * Set the default upload provider
    */
   setDefaultProvider(provider: UploadProvider): void {
-    console.log(`[FileUploadAdapter] Switching default provider from ${this.defaultProvider} to ${provider}`)
     this.defaultProvider = provider
+    console.log(`[FileUploadAdapter] Default provider changed to: ${provider}`)
   }
 
   /**
@@ -237,14 +251,10 @@ class FileUploadAdapter {
     return {
       default: this.defaultProvider,
       fallback: this.fallbackProvider,
-      available: ['azure', 'external']
+      available: ['azure', 'external', 'node']
     }
   }
 }
 
 // Create singleton instance
 export const fileUploadAdapter = new FileUploadAdapter()
-
-// Export types and class
-export { FileUploadAdapter }
-export type { UploadProvider, AdapterOptions }
