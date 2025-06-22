@@ -123,6 +123,7 @@ export interface ProcessingOptions {
 export interface HealthMetric {
   id: string
   userId: string
+  user_id?: string
   metricType: string
   value: number | string
   unit?: string

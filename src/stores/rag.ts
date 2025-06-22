@@ -124,14 +124,18 @@ export const useRAGStore = defineStore('rag', () => {
 
             // Import and use node file upload service for RAG processing
             const { nodeFileUploadService } = await import('@/services/nodeFileUploadService')
-            await nodeFileUploadService.processRAGDocument(uploadResult.id, authStore.user.id, {
+            const is_success = await nodeFileUploadService.processRAGDocument(uploadResult.documentId, authStore.user.id, {
               batchSize: options.chunkSize || 512,
               transformOptions: options
             })
 
+            if (!is_success) {
+              throw new Error('Failed to process RAG document')
+            }
+
             // Create document object for local state
             const document = {
-              id: uploadResult.id,
+              id: uploadResult.documentId,
               user_id: authStore.user.id,
               filename: file.name,
               file_type: file.type,

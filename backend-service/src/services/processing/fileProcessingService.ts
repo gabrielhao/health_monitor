@@ -4,10 +4,9 @@ import { parseString } from 'xml2js'
 import { promisify } from 'util'
 import type { 
   ProcessingJob, 
-  ProcessingResult, 
   HealthMetric, 
   ProcessingOptions,
-  FileProcessingRequest 
+  RAGDocument
 } from '../../shared/types/index.js'
 
 const parseXml = promisify(parseString)
@@ -44,9 +43,13 @@ export class FileProcessingService {
 
   //process given rag document id, and save the health metrics to the cosmos db
   async processFile(ragDocumentId: string, userId: string, options: ProcessingOptions = {}){
-    const ragDocument = await azureCosmosService.getRAGDocument(ragDocumentId, userId)
+    const ragDocument = await azureCosmosService.getRAGDocument(ragDocumentId)
     if (!ragDocument) {
       throw new Error('RAG document not found')
+    }
+
+    if (ragDocument.isProcessed) {
+      return true
     }
 
     //get file path from the rag document
@@ -64,8 +67,7 @@ export class FileProcessingService {
     //update the rag document is_processed to true
     const updatedRagDocument = await azureCosmosService.updateRAGDocument(
       ragDocumentId,
-      userId,
-      { isProcessed: true }
+      { ...ragDocument, isProcessed: true } as RAGDocument
     )
 
     return true

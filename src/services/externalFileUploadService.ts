@@ -14,7 +14,7 @@ export interface UploadResult {
   path: string
   url: string
   size: number
-  id: string
+  documentId: string
   metadata?: Record<string, any>
 }
 
@@ -29,7 +29,7 @@ export interface BatchUploadResult {
 export interface ApiResponse {
   success: boolean
   data?: {
-    id: string
+    documentId: string
     url: string
     path: string
     size: number
@@ -43,7 +43,7 @@ export interface BatchApiResponse {
   success: boolean
   data?: {
     uploads: Array<{
-      id: string
+      documentId: string
       url: string
       path: string
       size: number
@@ -59,7 +59,6 @@ class ExternalFileUploadService {
   private readonly baseUrl: string
   private readonly apiKey: string
   private readonly defaultTimeout: number = 300000 // 5 minutes
-  private readonly defaultChunkSize: number = 5 * 1024 * 1024 // 5MB
   private readonly maxRetries: number = 3
 
   constructor() {
@@ -169,7 +168,7 @@ class ExternalFileUploadService {
         path: result.data.path,
         url: result.data.url,
         size: result.data.size,
-        id: result.data.id,
+        documentId: result.data.documentId,
         metadata: result.data.metadata
       }
 

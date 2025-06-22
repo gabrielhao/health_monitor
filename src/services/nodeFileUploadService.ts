@@ -6,26 +6,6 @@ import type {
   BatchApiResponse 
 } from './externalFileUploadService.js'
 
-// Add missing types that aren't exported from externalFileUploadService
-interface ChunkedUploadInitResponse {
-  sessionId: string
-  totalChunks: number
-  chunkSize: number
-}
-
-interface ChunkedUploadStatus {
-  sessionId: string
-  uploadedChunks: number[]
-  totalChunks: number
-  status: 'pending' | 'uploading' | 'completed' | 'failed'
-  error?: string
-}
-
-// Extend RequestInit to include timeout
-interface RequestInitWithTimeout extends RequestInit {
-  timeout?: number
-}
-
 export interface NodeFileUploadServiceConfig {
   baseUrl: string
   timeout?: number
