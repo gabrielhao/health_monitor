@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
-import { supabase } from '@/services/supabase'
+import { azureCosmos } from '@/services/azureCosmos'
 import type { HealthMetric, MetricType } from '@/types'
 import { useAuthStore } from './auth'
 

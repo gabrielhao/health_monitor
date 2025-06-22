@@ -36,6 +36,8 @@ export const useRAGStore = defineStore('rag', () => {
 
     try {
       loading.value = true
+      // Add a small delay to ensure initialization completes
+      await new Promise(resolve => setTimeout(resolve, 1000))
       const docs = await RAGService.getDocuments(authStore.user.id)
       documents.value = docs
     } catch (error) {
@@ -118,7 +120,7 @@ export const useRAGStore = defineStore('rag', () => {
         }
 
         // Update session progress
-        await RAGService.updateImportSession(session.id, {
+        await RAGService.updateImportSession(session.id, authStore.user.id, {
           processed_files: processedCount,
           failed_files: failedCount,
           error_log: errors
@@ -127,7 +129,7 @@ export const useRAGStore = defineStore('rag', () => {
 
       // Final session update
       const finalStatus = failedCount === 0 ? 'completed' : (processedCount > 0 ? 'completed' : 'failed')
-      const updatedSession = await RAGService.updateImportSession(session.id, {
+      const updatedSession = await RAGService.updateImportSession(session.id, authStore.user.id, {
         status: finalStatus,
         completed_at: new Date().toISOString()
       })
@@ -149,8 +151,10 @@ export const useRAGStore = defineStore('rag', () => {
   }
 
   const deleteDocument = async (documentId: string) => {
+    if (!authStore.user) return
+    
     try {
-      await RAGService.deleteDocument(documentId)
+      await RAGService.deleteDocument(documentId, authStore.user.id)
       documents.value = documents.value.filter(doc => doc.id !== documentId)
     } catch (error) {
       console.error('Error deleting document:', error)

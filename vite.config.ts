@@ -8,9 +8,14 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      buffer: 'buffer',
     },
   },
   define: {
     __VUE_PROD_DEVTOOLS__: false,
+    global: 'globalThis',
   },
+  optimizeDeps: {
+    include: ['buffer']
+  }
 })

@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
-import { supabase } from '@/services/supabase'
+import { azureBlob } from '@/services/azureBlob'
+import { azureCosmos } from '@/services/azureCosmos'
 import { useAuthStore } from '@/stores/auth'
 
 export interface UploadProgress {
@@ -65,63 +66,42 @@ export function useFileUpload() {
       speed: 0,
       eta: 0,
       currentChunk: 0,
-      totalChunks: 1 // For Supabase storage, we treat it as a single chunk
+      totalChunks: 1 // For Azure Blob storage, we treat it as a single chunk
     }
 
     try {
       // Create a unique file path: userId/timestamp_filename
       const timestamp = Date.now()
-      const filePath = `${authStore.user.id}/${timestamp}_${file.name}`
+      const fileName = `${authStore.user.id}/${timestamp}_${file.name}`
 
-      console.log('[useFileUpload] Uploading to Supabase storage:', { filePath })
+      console.log('[useFileUpload] Uploading to Azure Blob storage:', { fileName })
 
-      // Upload file to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('health-files')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
+      // Upload file to Azure Blob storage with progress tracking
+      const uploadResult = await azureBlob.uploadFile(fileName, file, 'health-files', {
+        onProgress: (bytesUploaded: number) => {
+          const percentage = (bytesUploaded / file.size) * 100
+          updateProgress(percentage, file.size)
+          options.onProgress?.(percentage)
+        }
+      })
 
-      if (uploadError) {
-        console.error('[useFileUpload] Storage upload failed:', uploadError)
-        throw new Error(`Upload failed: ${uploadError.message}`)
-      }
+      console.log('[useFileUpload] File uploaded to storage:', uploadResult)
 
-      console.log('[useFileUpload] File uploaded to storage:', uploadData)
+      // Update progress to 90% after upload
+      updateProgress(90, file.size)
+      options.onProgress?.(90)
 
-      // Update progress to 50% after upload
-      updateProgress(50, file.size)
-      options.onProgress?.(50)
-
-      // Get public URL for the uploaded file
-      const { data: publicUrlData } = supabase.storage
-        .from('health-files')
-        .getPublicUrl(filePath)
-
-      console.log('[useFileUpload] Generated public URL:', publicUrlData.publicUrl)
-
-      // Insert metadata into health_documents table
-      const { data: documentData, error: documentError } = await supabase
-        .from('health_documents')
-        .insert({
-          user_id: authStore.user.id,
-          title: file.name,
-          file_name: file.name,
-          file_type: file.type,
-          file_url: publicUrlData.publicUrl,
-          size_bytes: file.size,
-          uploaded_at: new Date().toISOString()
-        })
-        .select('id')
-        .single()
-
-      if (documentError) {
-        console.error('[useFileUpload] Database insert failed:', documentError)
-        // Clean up uploaded file if database insert fails
-        await supabase.storage.from('health-files').remove([filePath])
-        throw new Error(`Failed to save file metadata: ${documentError.message}`)
-      }
+      // Insert metadata into Azure Cosmos DB
+      const documentData = await azureCosmos.createHealthDocument({
+        user_id: authStore.user.id,
+        title: file.name,
+        file_name: file.name,
+        file_type: file.type,
+        file_url: uploadResult.url,
+        size_bytes: file.size,
+        source_app: 'web-upload',
+        document_type: 'user-upload'
+      })
 
       console.log('[useFileUpload] File metadata saved:', documentData)
 
@@ -132,7 +112,7 @@ export function useFileUpload() {
 
       console.log('[useFileUpload] Upload completed successfully:', { 
         documentId: documentData.id,
-        fileUrl: publicUrlData.publicUrl 
+        fileUrl: uploadResult.url 
       })
 
       return documentData.id
@@ -209,26 +189,16 @@ export function useFileUpload() {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  
+  if (bytes === 0) return '0 Bytes'
   const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 function formatTime(seconds: number): string {
-  if (seconds === 0) return '--'
-  
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const remainingSeconds = Math.floor(seconds % 60)
-  
-  let result = ''
-  if (hours > 0) result += `${hours}h `
-  if (minutes > 0) result += `${minutes}m `
-  result += `${remainingSeconds}s`
-  
-  return result
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.round(seconds % 60)
+  return `${minutes}m ${remainingSeconds}s`
 }

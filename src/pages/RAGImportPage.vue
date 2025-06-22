@@ -35,7 +35,7 @@
             <div class="space-y-3">
               <CloudArrowUpIcon class="w-12 h-12 text-neutral-400 mx-auto" />
               <div>
-                <button @click="$refs.fileInput?.click()" class="text-primary-600 hover:text-primary-500 font-medium">
+                <button @click="fileInput?.click()" class="text-primary-600 hover:text-primary-500 font-medium">
                   Click to upload files
                 </button>
                 <span class="text-neutral-600"> or drag and drop</span>

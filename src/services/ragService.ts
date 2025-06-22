@@ -1,4 +1,6 @@
-import { supabase } from './supabase'
+import { azureCosmos } from './azureCosmos'
+import { azureBlob } from './azureBlob'
+import { azureEmbedding } from './azureEmbedding'
 import type { RAGDocument, RAGChunk, RAGImportSession, RAGProcessingOptions } from '@/types/rag'
 
 export class RAGService {
@@ -37,49 +39,34 @@ export class RAGService {
   }
 
   static async createImportSession(userId: string, fileCount: number): Promise<RAGImportSession> {
-    const { data, error } = await supabase
-      .from('rag_import_sessions')
-      .insert({
-        user_id: userId,
-        total_files: fileCount,
-        processed_files: 0,
-        failed_files: 0,
-        total_chunks: 0,
-        total_embeddings: 0,
-        status: 'processing',
-        error_log: []
-      })
-      .select()
-      .single()
+    const session = await azureCosmos.createRagImportSession({
+      user_id: userId,
+      total_files: fileCount,
+      processed_files: 0,
+      failed_files: 0,
+      total_chunks: 0,
+      total_embeddings: 0,
+      status: 'processing',
+      error_log: []
+    })
 
-    if (error) throw error
-    return data
+    return session
   }
 
   static async updateImportSession(
     sessionId: string, 
+    userId: string,
     updates: Partial<RAGImportSession>
   ): Promise<RAGImportSession> {
-    const { data, error } = await supabase
-      .from('rag_import_sessions')
-      .update(updates)
-      .eq('id', sessionId)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
+    const session = await azureCosmos.updateRagImportSession(sessionId, userId, updates)
+    return session
   }
 
   static async uploadFile(file: File, userId: string): Promise<string> {
     const fileName = `${userId}/${Date.now()}_${file.name}`
     
-    const { data, error } = await supabase.storage
-      .from('rag-documents')
-      .upload(fileName, file)
-
-    if (error) throw error
-    return fileName
+    const result = await azureBlob.uploadFile(file, userId, fileName)
+    return result.path
   }
 
   static async processDocument(
@@ -89,45 +76,32 @@ export class RAGService {
     options: RAGProcessingOptions
   ): Promise<RAGDocument> {
     try {
-      // Upload file to storage
+      // Upload file to Azure Blob Storage
       const filePath = await this.uploadFile(file, userId)
 
-      // Create document record
-      const { data: document, error: docError } = await supabase
-        .from('rag_documents')
-        .insert({
-          user_id: userId,
-          filename: file.name,
-          file_type: file.type,
-          file_size: file.size,
-          content: '', // Will be updated after processing
-          status: 'processing',
-          chunk_count: 0,
-          embedding_count: 0,
-          metadata: {
-            file_path: filePath,
-            session_id: sessionId,
-            processing_options: options
-          }
-        })
-        .select()
-        .single()
-
-      if (docError) throw docError
-
-      // Process document via edge function
-      const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'process-rag-document',
-        {
-          body: {
-            documentId: document.id,
-            filePath,
-            options
-          }
+      // Create document record in Cosmos DB
+      const document = await azureCosmos.createRagDocument({
+        user_id: userId,
+        filename: file.name,
+        file_type: file.type,
+        file_size: file.size,
+        content: '', // Will be updated after processing
+        status: 'processing',
+        chunk_count: 0,
+        embedding_count: 0,
+        metadata: {
+          file_path: filePath,
+          session_id: sessionId,
+          processing_options: options
         }
-      )
+      })
 
-      if (processError) throw processError
+      // Process document via Azure Function
+      const processResult = await this.callAzureFunction('process-rag-document', {
+        documentId: document.id,
+        filePath,
+        options
+      })
 
       return processResult.document
     } catch (error) {
@@ -137,26 +111,13 @@ export class RAGService {
   }
 
   static async getDocuments(userId: string, limit = 50): Promise<RAGDocument[]> {
-    const { data, error } = await supabase
-      .from('rag_documents')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (error) throw error
-    return data || []
+    const documents = await azureCosmos.getRagDocuments(userId, { limit })
+    return documents || []
   }
 
   static async getImportSessions(userId: string): Promise<RAGImportSession[]> {
-    const { data, error } = await supabase
-      .from('rag_import_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('started_at', { ascending: false })
-
-    if (error) throw error
-    return data || []
+    const sessions = await azureCosmos.getRagImportSessions(userId)
+    return sessions || []
   }
 
   static async searchSimilarChunks(
@@ -165,68 +126,67 @@ export class RAGService {
     limit = 10
   ): Promise<RAGChunk[]> {
     // First, generate embedding for the query
-    const { data: embeddingResult, error: embeddingError } = await supabase.functions.invoke(
-      'generate-query-embedding',
+    const embedding = await azureEmbedding.generateQueryEmbedding(query)
+
+    // Search for similar chunks using vector similarity
+    const similarChunks = await azureCosmos.searchSimilarRagChunks(
+      embedding,
+      userId,
       {
-        body: { query }
+        threshold: 0.8,
+        limit
       }
     )
 
-    if (embeddingError) throw embeddingError
-
-    // Search for similar chunks using vector similarity
-    const { data, error } = await supabase.rpc('search_similar_chunks', {
-      query_embedding: embeddingResult.embedding,
-      user_id_param: userId,
-      match_threshold: 0.8,
-      match_count: limit
-    })
-
-    if (error) throw error
-    return data || []
+    return similarChunks || []
   }
 
-  static async deleteDocument(documentId: string): Promise<void> {
+  static async deleteDocument(documentId: string, userId: string): Promise<void> {
     // Delete chunks first
-    await supabase
-      .from('rag_chunks')
-      .delete()
-      .eq('document_id', documentId)
+    await azureCosmos.deleteRagChunksByDocument(documentId, userId)
 
     // Delete document
-    const { error } = await supabase
-      .from('rag_documents')
-      .delete()
-      .eq('id', documentId)
+    await azureCosmos.deleteRagDocument(documentId, userId)
+  }
 
-    if (error) throw error
+  private static async callAzureFunction(functionName: string, body: any): Promise<any> {
+    // Call Azure Function using HTTP request
+    const response = await fetch(`/api/${functionName}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      throw new Error(`Azure Function call failed: ${response.statusText}`)
+    }
+
+    return await response.json()
   }
 
   static getFileIcon(fileType: string): string {
-    switch (fileType) {
-      case 'application/pdf':
-        return '📄'
-      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-        return '📝'
-      case 'text/plain':
-        return '📃'
-      case 'text/csv':
-        return '📊'
-      case 'application/json':
-        return '🔧'
-      case 'application/xml':
-      case 'text/xml':
-        return '📋'
-      default:
-        return '📁'
+    const iconMap: Record<string, string> = {
+      'application/pdf': '📄',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📝',
+      'text/plain': '📄',
+      'text/csv': '📊',
+      'application/json': '📋',
+      'application/xml': '📄',
+      'text/xml': '📄'
     }
+    
+    return iconMap[fileType] || '📄'
   }
 
   static formatFileSize(bytes: number): string {
     if (bytes === 0) return '0 Bytes'
+    
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
+    
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 }

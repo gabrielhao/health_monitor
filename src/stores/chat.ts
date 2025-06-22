@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, readonly } from 'vue'
-import { supabase } from '@/services/supabase'
+import { azureCosmos } from '@/services/azureCosmos'
 import type { ChatMessage } from '@/types'
 import { useAuthStore } from './auth'
 
@@ -18,16 +18,8 @@ export const useChatStore = defineStore('chat', () => {
     try {
       loading.value = true
       
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('user_id', authStore.user.id)
-        .order('created_at', { ascending: true })
-        .limit(limit)
-
-      if (error) throw error
-
-      messages.value = data || []
+      const chatMessages = await azureCosmos.getChatMessages(authStore.user.id, { limit })
+      messages.value = chatMessages || []
     } catch (error) {
       console.error('Error fetching messages:', error)
       throw error
@@ -42,18 +34,12 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       // Add user message
-      const { data: userMessage, error: userError } = await supabase
-        .from('chat_messages')
-        .insert({
-          user_id: authStore.user.id,
-          message,
-          sender_type: 'user',
-          message_type: messageType,
-        })
-        .select()
-        .single()
-
-      if (userError) throw userError
+      const userMessage = await azureCosmos.createChatMessage({
+        user_id: authStore.user.id,
+        message,
+        sender_type: 'user',
+        message_type: messageType,
+      })
 
       messages.value.push(userMessage)
 
@@ -61,18 +47,12 @@ export const useChatStore = defineStore('chat', () => {
       typing.value = true
       const aiResponse = await generateAIResponse(message)
       
-      const { data: aiMessage, error: aiError } = await supabase
-        .from('chat_messages')
-        .insert({
-          user_id: authStore.user.id,
-          message: aiResponse,
-          sender_type: 'ai',
-          message_type: 'text',
-        })
-        .select()
-        .single()
-
-      if (aiError) throw aiError
+      const aiMessage = await azureCosmos.createChatMessage({
+        user_id: authStore.user.id,
+        message: aiResponse,
+        sender_type: 'ai',
+        message_type: 'text',
+      })
 
       messages.value.push(aiMessage)
       
@@ -132,13 +112,9 @@ export const useChatStore = defineStore('chat', () => {
   // Delete message
   const deleteMessage = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
+      if (!authStore.user) return
+      
+      await azureCosmos.deleteChatMessage(id, authStore.user.id)
       messages.value = messages.value.filter(m => m.id !== id)
     } catch (error) {
       console.error('Error deleting message:', error)
@@ -151,13 +127,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!authStore.user) return
 
     try {
-      const { error } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('user_id', authStore.user.id)
-
-      if (error) throw error
-
+      await azureCosmos.clearChatMessages(authStore.user.id)
       messages.value = []
     } catch (error) {
       console.error('Error clearing messages:', error)

@@ -439,7 +439,6 @@ import { useVectorStore } from '@/stores/vector'
 import { useRouter } from 'vue-router'
 import { useFileUpload } from '@/composables/useFileUpload'
 import { format } from 'date-fns'
-import { supabase } from '@/services/supabase'
 import FileUploadProgress from '@/components/shared/FileUploadProgress.vue'
 import {
   CloudArrowUpIcon,
@@ -627,25 +626,33 @@ const handleUpload = async () => {
     console.log('File processed successfully:', sessionId)
 
     // Start server-side processing
-    const { data, error } = await supabase.functions.invoke('process-health-file', {
-      body: {
-        sessionId,
-        source: uploadForm.source,
-        metadata: {
-          filename: uploadForm.file.name,
-          filesize: uploadForm.file.size,
-          filetype: uploadForm.file.type,
-          notes: uploadForm.notes,
-          processed_at: new Date().toISOString(),
-          chunk_size: uploadForm.chunkSize,
-          total_chunks: currentImport.value?.total_records ? Math.ceil(currentImport.value.total_records / 100) : undefined
-        }
+    const payload = {
+      sessionId,
+      source: uploadForm.source,
+      metadata: {
+        filename: uploadForm.file.name,
+        filesize: uploadForm.file.size,
+        filetype: uploadForm.file.type,
+        notes: uploadForm.notes,
+        processed_at: new Date().toISOString(),
+        chunk_size: uploadForm.chunkSize,
+        total_chunks: currentImport.value?.total_records ? Math.ceil(currentImport.value.total_records / 100) : undefined
       }
+    }
+
+    const response = await fetch('/api/process-health-file', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
     })
 
-    if (error) {
-      throw new Error(`Processing failed: ${error.message}`)
+    if (!response.ok) {
+      throw new Error(`Azure Function call failed: ${response.statusText}`)
     }
+
+    const data = await response.json()
 
     console.log('Processing completed:', data)
     currentImport.value = {

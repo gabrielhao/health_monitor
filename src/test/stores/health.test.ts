@@ -3,10 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useHealthStore } from '@/stores/health'
 import { useAuthStore } from '@/stores/auth'
 import { mockSupabaseClient, createMockUser } from '../mocks/supabase'
-
-vi.mock('@/services/supabase', () => ({
-  supabase: mockSupabaseClient
-}))
+import type { HealthMetric, MetricType } from '@/types'
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: vi.fn()
@@ -29,23 +26,25 @@ describe('Health Store', () => {
   describe('fetchMetrics', () => {
     it('should fetch all metrics successfully', async () => {
       // Arrange
-      const mockMetrics = [
+      const mockMetrics: HealthMetric[] = [
         {
           id: 'metric-1',
           user_id: 'test-user-id',
-          metric_type: 'blood_pressure',
+          metric_type: 'blood_pressure' as MetricType,
           systolic: 120,
           diastolic: 80,
           unit: 'mmHg',
-          recorded_at: '2024-01-01T10:00:00Z'
+          recorded_at: '2024-01-01T10:00:00Z',
+          created_at: '2024-01-01T10:00:00Z'
         },
         {
           id: 'metric-2',
           user_id: 'test-user-id',
-          metric_type: 'heart_rate',
+          metric_type: 'heart_rate' as MetricType,
           value: 72,
           unit: 'bpm',
-          recorded_at: '2024-01-01T11:00:00Z'
+          recorded_at: '2024-01-01T11:00:00Z',
+          created_at: '2024-01-01T11:00:00Z'
         }
       ]
 
@@ -71,12 +70,15 @@ describe('Health Store', () => {
 
     it('should fetch metrics filtered by type', async () => {
       // Arrange
-      const heartRateMetrics = [
+      const heartRateMetrics: HealthMetric[] = [
         {
           id: 'metric-1',
-          metric_type: 'heart_rate',
+          user_id: 'test-user-id',
+          metric_type: 'heart_rate' as MetricType,
           value: 72,
-          unit: 'bpm'
+          unit: 'bpm',
+          recorded_at: '2024-01-01T10:00:00Z',
+          created_at: '2024-01-01T10:00:00Z'
         }
       ]
 
@@ -134,13 +136,13 @@ describe('Health Store', () => {
     it('should add metric successfully', async () => {
       // Arrange
       const newMetric = {
-        metric_type: 'weight',
+        metric_type: 'weight' as MetricType,
         value: 70.5,
         unit: 'kg',
         recorded_at: '2024-01-01T10:00:00Z'
       }
 
-      const createdMetric = {
+      const createdMetric: HealthMetric = {
         id: 'metric-new',
         user_id: 'test-user-id',
         ...newMetric,
@@ -182,7 +184,7 @@ describe('Health Store', () => {
 
       // Act & Assert
       await expect(healthStore.addMetric({
-        metric_type: 'weight',
+        metric_type: 'weight' as MetricType,
         value: 70,
         unit: 'kg',
         recorded_at: '2024-01-01T10:00:00Z'
@@ -196,7 +198,7 @@ describe('Health Store', () => {
 
       // Act & Assert
       await expect(healthStore.addMetric({
-        metric_type: 'weight',
+        metric_type: 'weight' as MetricType,
         value: 70,
         unit: 'kg',
         recorded_at: '2024-01-01T10:00:00Z'
@@ -207,18 +209,22 @@ describe('Health Store', () => {
   describe('updateMetric', () => {
     it('should update metric successfully', async () => {
       // Arrange
-      const existingMetric = {
+      const existingMetric: HealthMetric = {
         id: 'metric-1',
-        metric_type: 'weight',
+        user_id: 'test-user-id',
+        metric_type: 'weight' as MetricType,
         value: 70,
-        unit: 'kg'
+        unit: 'kg',
+        recorded_at: '2024-01-01T10:00:00Z',
+        created_at: '2024-01-01T10:00:00Z'
       }
 
-      const updatedMetric = {
+      const updatedMetric: HealthMetric = {
         ...existingMetric,
         value: 69.5
       }
 
+      const healthStore = useHealthStore()
       healthStore.metrics = [existingMetric]
 
       mockSupabaseClient.from().update.mockReturnValue({
@@ -231,9 +237,6 @@ describe('Health Store', () => {
           })
         })
       })
-
-      const healthStore = useHealthStore()
-      healthStore.metrics = [existingMetric]
 
       // Act
       const result = await healthStore.updateMetric('metric-1', { value: 69.5 })
@@ -259,14 +262,40 @@ describe('Health Store', () => {
       await expect(healthStore.updateMetric('metric-1', { value: 69.5 }))
         .rejects.toThrow('Update failed')
     })
+
+    it('should require authentication', async () => {
+      // Arrange
+      mockAuthStore.user = null
+      const healthStore = useHealthStore()
+
+      // Act & Assert
+      await expect(healthStore.updateMetric('metric-1', { value: 69.5 }))
+        .rejects.toThrow('Not authenticated')
+    })
   })
 
   describe('deleteMetric', () => {
     it('should delete metric successfully', async () => {
       // Arrange
-      const existingMetrics = [
-        { id: 'metric-1', metric_type: 'weight', value: 70 },
-        { id: 'metric-2', metric_type: 'heart_rate', value: 72 }
+      const existingMetrics: HealthMetric[] = [
+        {
+          id: 'metric-1',
+          user_id: 'test-user-id',
+          metric_type: 'weight' as MetricType,
+          value: 70,
+          unit: 'kg',
+          recorded_at: '2024-01-01T10:00:00Z',
+          created_at: '2024-01-01T10:00:00Z'
+        },
+        {
+          id: 'metric-2',
+          user_id: 'test-user-id',
+          metric_type: 'heart_rate' as MetricType,
+          value: 72,
+          unit: 'bpm',
+          recorded_at: '2024-01-01T11:00:00Z',
+          created_at: '2024-01-01T11:00:00Z'
+        }
       ]
 
       mockSupabaseClient.from().delete.mockReturnValue({
@@ -301,26 +330,36 @@ describe('Health Store', () => {
   })
 
   describe('getMetricsForDateRange', () => {
-    it('should fetch metrics for specific date range', async () => {
+    it('should fetch metrics within date range', async () => {
       // Arrange
-      const dateRangeMetrics = [
+      const mockMetrics: HealthMetric[] = [
         {
-          id: 'metric-1',
-          metric_type: 'heart_rate',
+          id: '1',
+          user_id: 'test-user-id',
+          metric_type: 'heart_rate' as MetricType,
           value: 72,
-          recorded_at: '2024-01-01T10:00:00Z'
+          unit: 'bpm',
+          recorded_at: '2024-01-01T10:00:00Z',
+          created_at: '2024-01-01T10:00:00Z'
+        },
+        {
+          id: '2',
+          user_id: 'test-user-id',
+          metric_type: 'heart_rate' as MetricType,
+          value: 75,
+          unit: 'bpm',
+          recorded_at: '2024-01-02T10:00:00Z',
+          created_at: '2024-01-02T10:00:00Z'
         }
       ]
 
       mockSupabaseClient.from().select.mockReturnValue({
         eq: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            gte: vi.fn().mockReturnValue({
-              lte: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({
-                  data: dateRangeMetrics,
-                  error: null
-                })
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: mockMetrics,
+                error: null
               })
             })
           })
@@ -331,23 +370,35 @@ describe('Health Store', () => {
 
       // Act
       const result = await healthStore.getMetricsForDateRange(
-        'heart_rate',
+        'heart_rate' as MetricType,
         '2024-01-01T00:00:00Z',
         '2024-01-31T23:59:59Z'
       )
 
       // Assert
-      expect(result).toEqual(dateRangeMetrics)
+      expect(result).toEqual(mockMetrics)
     })
 
-    it('should return empty array when user not authenticated', async () => {
+    it('should handle empty results', async () => {
       // Arrange
-      mockAuthStore.user = null
+      mockSupabaseClient.from().select.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null
+              })
+            })
+          })
+        })
+      })
+
       const healthStore = useHealthStore()
 
       // Act
       const result = await healthStore.getMetricsForDateRange(
-        'heart_rate',
+        'heart_rate' as MetricType,
         '2024-01-01T00:00:00Z',
         '2024-01-31T23:59:59Z'
       )
@@ -357,14 +408,83 @@ describe('Health Store', () => {
     })
   })
 
+  describe('Latest Metrics', () => {
+    it('should return latest metric for each type', async () => {
+      // Arrange
+      const mixedMetrics: HealthMetric[] = [
+        {
+          id: '1',
+          user_id: 'test-user-id',
+          metric_type: 'heart_rate' as MetricType,
+          value: 72,
+          unit: 'bpm',
+          recorded_at: '2024-01-01T10:00:00Z',
+          created_at: '2024-01-01T10:00:00Z'
+        },
+        {
+          id: '2',
+          user_id: 'test-user-id',
+          metric_type: 'weight' as MetricType,
+          value: 70,
+          unit: 'kg',
+          recorded_at: '2024-01-01T11:00:00Z',
+          created_at: '2024-01-01T11:00:00Z'
+        },
+        {
+          id: '3',
+          user_id: 'test-user-id',
+          metric_type: 'heart_rate' as MetricType,
+          value: 75,
+          unit: 'bpm',
+          recorded_at: '2024-01-02T10:00:00Z',
+          created_at: '2024-01-02T10:00:00Z'
+        },
+        {
+          id: '4',
+          user_id: 'test-user-id',
+          metric_type: 'blood_pressure' as MetricType,
+          systolic: 120,
+          diastolic: 80,
+          unit: 'mmHg',
+          recorded_at: '2024-01-01T12:00:00Z',
+          created_at: '2024-01-01T12:00:00Z'
+        }
+      ]
+
+      const healthStore = useHealthStore()
+      healthStore.metrics = mixedMetrics
+
+      // Act
+      const latestMetrics = healthStore.latestMetrics
+
+      // Assert
+      expect(Object.keys(latestMetrics)).toHaveLength(3) // One for each metric type
+      expect(latestMetrics['heart_rate']?.value).toBe(75) // Latest heart rate
+      expect(latestMetrics['weight']?.value).toBe(70)
+      expect(latestMetrics['blood_pressure']?.systolic).toBe(120)
+    })
+
+    it('should handle empty metrics array', () => {
+      // Arrange
+      const healthStore = useHealthStore()
+      healthStore.metrics = []
+
+      // Act
+      const latestMetrics = healthStore.latestMetrics
+
+      // Assert
+      expect(Object.keys(latestMetrics)).toHaveLength(0)
+    })
+  })
+
   describe('Computed Properties', () => {
     it('should group metrics by type correctly', () => {
       // Arrange
       const mixedMetrics = [
-        { id: '1', metric_type: 'heart_rate', value: 72 },
-        { id: '2', metric_type: 'weight', value: 70 },
-        { id: '3', metric_type: 'heart_rate', value: 75 },
-        { id: '4', metric_type: 'blood_pressure', systolic: 120, diastolic: 80 }
+        { id: '1', metric_type: 'heart_rate' as MetricType, value: 72 },
+        { id: '2', metric_type: 'weight' as MetricType, value: 70 },
+        { id: '3', metric_type: 'heart_rate' as MetricType, value: 75 },
+        { id: '4', metric_type: 'blood_pressure' as MetricType, systolic: 120, diastolic: 80 }
       ]
 
       const healthStore = useHealthStore()
@@ -386,19 +506,19 @@ describe('Health Store', () => {
       const metricsWithDates = [
         {
           id: '1',
-          metric_type: 'heart_rate',
+          metric_type: 'heart_rate' as MetricType,
           value: 72,
           recorded_at: '2024-01-01T10:00:00Z'
         },
         {
           id: '2',
-          metric_type: 'heart_rate',
+          metric_type: 'heart_rate' as MetricType,
           value: 75,
           recorded_at: '2024-01-02T10:00:00Z' // More recent
         },
         {
           id: '3',
-          metric_type: 'weight',
+          metric_type: 'weight' as MetricType,
           value: 70,
           recorded_at: '2024-01-01T11:00:00Z'
         }
