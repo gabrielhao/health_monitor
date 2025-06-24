@@ -1,15 +1,27 @@
 <template>
-  <nav class="fixed top-0 left-0 h-full w-64 bg-white border-r border-neutral-200 z-50 transform transition-transform duration-300 lg:translate-x-0" :class="{ '-translate-x-full': !isOpen && isMobile }">
+  <nav
+    class="fixed top-0 left-0 h-full w-64 bg-white border-r border-neutral-200 z-50 transform transition-transform duration-300 lg:translate-x-0"
+    :class="{ '-translate-x-full': !isOpen && isMobile }"
+  >
     <div class="flex flex-col h-full">
       <!-- Header -->
-      <div class="flex items-center justify-between p-6 border-b border-neutral-200">
+      <div
+        class="flex items-center justify-between pl-10 border-b border-neutral-200"
+      >
         <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-            <HeartIcon class="w-5 h-5 text-white" />
+          <div class="w-24 h-24 rounded-lg flex items-center justify-center">
+            <!-- 用自己的 logo 图片替换 HeartIcon -->
+            <img
+              src="@/assets/AIvital_logo.png"
+              alt="Logo"
+              class="w-24 h-24 object-contain"
+            />
           </div>
-          <span class="text-xl font-semibold text-neutral-900">Aivital</span>
         </div>
-        <button @click="toggleNavigation" class="lg:hidden p-1 rounded-md hover:bg-neutral-100">
+        <button
+          @click="toggleNavigation"
+          class="lg:hidden p-1 rounded-md hover:bg-neutral-100"
+        >
           <XMarkIcon class="w-5 h-5" />
         </button>
       </div>
@@ -21,7 +33,11 @@
             <router-link
               :to="item.to"
               class="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200"
-              :class="item.name === currentRoute ? 'bg-primary-100 text-primary-700' : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'"
+              :class="
+                item.name === currentRoute
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
+              "
             >
               <component :is="item.icon" class="w-5 h-5 mr-3" />
               {{ item.name }}
@@ -33,7 +49,9 @@
       <!-- User Profile -->
       <div class="p-4 border-t border-neutral-200">
         <div class="flex items-center space-x-3 mb-4">
-          <div class="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+          <div
+            class="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center"
+          >
             <UserIcon class="w-6 h-6 text-primary-600" />
           </div>
           <div class="flex-1 min-w-0">
@@ -74,11 +92,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 import {
-  HeartIcon,
+
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   ClipboardDocumentListIcon,
@@ -89,14 +107,14 @@ import {
   Bars3Icon,
   CloudArrowUpIcon,
   DocumentTextIcon,
-} from '@heroicons/vue/24/outline'
+} from '@heroicons/vue/24/outline';
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
+const route = useRoute();
+const router = useRouter();
+const authStore = useAuthStore();
 
-const isOpen = ref(false)
-const isMobile = ref(false)
+const isOpen = ref(false);
+const isMobile = ref(false);
 
 const navigationItems = [
   { name: 'Dashboard', to: '/dashboard', icon: ChartBarIcon },
@@ -106,43 +124,43 @@ const navigationItems = [
   { name: 'Import Data', to: '/import', icon: CloudArrowUpIcon },
   { name: 'RAG Documents', to: '/rag-import', icon: DocumentTextIcon },
   { name: 'Profile', to: '/profile', icon: Cog6ToothIcon },
-]
+];
 
 const currentRoute = computed(() => {
-  const matchedItem = navigationItems.find(item => item.to === route.path)
-  return matchedItem?.name || ''
-})
+  const matchedItem = navigationItems.find((item) => item.to === route.path);
+  return matchedItem?.name || '';
+});
 
 const checkMobile = () => {
-  isMobile.value = window.innerWidth < 1024
+  isMobile.value = window.innerWidth < 1024;
   if (!isMobile.value) {
-    isOpen.value = false
+    isOpen.value = false;
   }
-}
+};
 
 const toggleNavigation = () => {
-  isOpen.value = !isOpen.value
-}
+  isOpen.value = !isOpen.value;
+};
 
 const closeNavigation = () => {
-  isOpen.value = false
-}
+  isOpen.value = false;
+};
 
 const handleSignOut = async () => {
   try {
-    await authStore.signOut()
-    router.push('/auth')
+    await authStore.signOut();
+    router.push('/auth');
   } catch (error) {
-    console.error('Error signing out:', error)
+    console.error('Error signing out:', error);
   }
-}
+};
 
 onMounted(() => {
-  checkMobile()
-  window.addEventListener('resize', checkMobile)
-})
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+});
 
 onUnmounted(() => {
-  window.removeEventListener('resize', checkMobile)
-})
+  window.removeEventListener('resize', checkMobile);
+});
 </script>
