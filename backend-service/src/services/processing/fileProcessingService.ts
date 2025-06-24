@@ -59,15 +59,16 @@ export class FileProcessingService {
     const fileBuffer = await azureBlobService.downloadFile(filePath)
 
     //parse the file to health metrics
-    const healthMetrics = await this.parseXmlToHealthMetrics(fileBuffer, ragDocument.userId, options)
+    const healthMetrics = await this.parseXmlToHealthMetrics(fileBuffer, ragDocument.user_id, options)
     
     //save health metrics to the cosmos db
     const savedMetrics = await azureCosmosService.createHealthMetricsBatch(healthMetrics)
 
     //update the rag document is_processed to true
+    ragDocument.isProcessed = true
     const updatedRagDocument = await azureCosmosService.updateRAGDocument(
       ragDocumentId,
-      { ...ragDocument, isProcessed: true } as RAGDocument
+      ragDocument
     )
 
     return true

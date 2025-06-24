@@ -58,7 +58,7 @@ export interface BatchApiResponse {
 class ExternalFileUploadService {
   private readonly baseUrl: string
   private readonly apiKey: string
-  private readonly defaultTimeout: number = 300000 // 5 minutes
+  private readonly defaultTimeout: number = 480000 // 8 minutes
   private readonly maxRetries: number = 3
 
   constructor() {

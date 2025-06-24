@@ -152,19 +152,6 @@
               Generate embeddings for semantic search
             </label>
           </div>
-
-          <div class="flex items-center space-x-3">
-            <input 
-              id="preserveFormatting" 
-              v-model="processingOptions.preserveFormatting" 
-              type="checkbox" 
-              class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-            />
-            <label for="preserveFormatting" class="text-sm font-medium text-neutral-700">
-              Preserve document formatting
-            </label>
-          </div>
-
           <button
             @click="processFiles"
             :disabled="selectedFiles.length === 0 || ragStore.processing"

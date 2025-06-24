@@ -181,7 +181,7 @@ export interface AzureConfig {
 // RAG Documents Types
 export interface RAGDocument {
   id: string
-  userId: string
+  user_id: string
   documentId: string
   documentFilePath: string
   isProcessed: boolean

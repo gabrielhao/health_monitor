@@ -19,7 +19,7 @@ const CONTAINER_CONFIGS: Record<string, ContainerConfig> = {
   },
   ragDocuments: {
     name: 'ragDocuments',
-    partitionKey: '/userId',
+    partitionKey: '/user_id', // Should match the actual field name in RAGDocument
     envVarName: 'AZURE_COSMOS_CONTAINER_RAG_DOCUMENTS',
     defaultName: 'rag_documents'
   }
@@ -156,6 +156,8 @@ export class AzureCosmosService {
       createdMetrics.push(response.resource as HealthMetric)
     }
 
+    console.log(`[CosmosDB] Successfully stored ${createdMetrics.length} health metrics`)
+
     return createdMetrics
   }
 
@@ -248,14 +250,30 @@ export class AzureCosmosService {
     this.ensureConnection()
     const container = this.getContainer('ragDocuments')
     
+    // Generate a more robust unique ID
+    const timestamp = Date.now()
+    const randomSuffix = Math.random().toString(36).substring(2, 11) // Use substring instead of deprecated substr
+    const documentId = `doc_${document.user_id}_${timestamp}_${randomSuffix}`
+    
     const newDocument: RAGDocument = {
       ...document,
-      id: `doc_${document.userId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      _partitionKey: document.userId
+      id: documentId,
+      _partitionKey: document.user_id
     }
-
-    const response = await container.items.create(newDocument)
-    return response.resource as RAGDocument
+    
+    try {
+      const response = await container.items.create(newDocument)
+      
+      // Validate response before returning
+      if (!response.resource) {
+        throw new Error('Failed to create RAG document: No resource returned')
+      }
+      
+      return response.resource as RAGDocument
+    } catch (error) {
+      console.error(`[CosmosDB] Error creating RAG document for user ${document.user_id}:`, error)
+      throw error
+    }
   }
 
   async getRAGDocument(documentId: string): Promise<RAGDocument | null> {
@@ -266,6 +284,7 @@ export class AzureCosmosService {
       const response = await container.item(documentId).read()
       return response.resource as RAGDocument
     } catch (error) {
+      console.error(`[CosmosDB] Error getting RAG document ${documentId}:`, error)
       return null
     }
   }
@@ -280,7 +299,7 @@ export class AzureCosmosService {
     this.ensureConnection()
     const container = this.getContainer('ragDocuments')
     
-    let query = 'SELECT * FROM c WHERE c.userId = @userId'
+    let query = 'SELECT * FROM c WHERE c.user_id = @userId'
     const parameters = [{ name: '@userId', value: userId }]
 
     if (options.isProcessed !== undefined) {
@@ -315,6 +334,7 @@ export class AzureCosmosService {
   async deleteRAGDocument(documentId: string, userId: string): Promise<void> {
     this.ensureConnection()
     const container = this.getContainer('ragDocuments')
+    // Use userId as partition key value since it matches user_id field
     await container.item(documentId, userId).delete()
   }
 
@@ -322,7 +342,7 @@ export class AzureCosmosService {
     this.ensureConnection()
     const container = this.getContainer('ragDocuments')
     
-    let query = 'SELECT VALUE COUNT(1) FROM c WHERE c.userId = @userId'
+    let query = 'SELECT VALUE COUNT(1) FROM c WHERE c.user_id = @userId'
     const parameters = [{ name: '@userId', value: userId }]
 
     if (isProcessed !== undefined) {

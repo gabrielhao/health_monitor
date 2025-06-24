@@ -119,19 +119,19 @@ export const useRAGStore = defineStore('rag', () => {
             progressItem.status = 'processing'
             progressItem.progress = 50
 
-            // Trigger file processing automatically after successful upload
-           
-
-            // Import and use node file upload service for RAG processing
+            // Trigger file processing asynchronously (fire-and-forget)
             const { nodeFileUploadService } = await import('@/services/nodeFileUploadService')
-            const is_success = await nodeFileUploadService.processRAGDocument(uploadResult.documentId, authStore.user.id, {
+            
+            // Start RAG processing asynchronously without waiting for completion
+            nodeFileUploadService.processRAGDocument(uploadResult.documentId, authStore.user.id, {
               batchSize: options.chunkSize || 512,
               transformOptions: options
+            }).catch(error => {
+              console.error(`Async RAG processing failed for document ${uploadResult.documentId}:`, error)
+              // Optionally, you could update the document status in the database here
+              // or emit an event to notify the UI of processing failures
+              throw error
             })
-
-            if (!is_success) {
-              throw new Error('Failed to process RAG document')
-            }
 
             // Create document object for local state
             const document = {

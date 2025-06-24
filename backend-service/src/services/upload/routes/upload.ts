@@ -80,7 +80,7 @@ router.post('', upload.single('file'), async (req: AuthRequest, res) => {
     let ragDocument
     try {
       ragDocument = await azureCosmosService.createRAGDocument({
-        userId,
+        user_id: userId,
         documentId: blobResult.id,
         documentFilePath: blobResult.path,
         isProcessed: false,
@@ -111,7 +111,7 @@ router.post('', upload.single('file'), async (req: AuthRequest, res) => {
         blobId: blobResult.id,
         // Document information (what was actually saved)
         documentId: ragDocument.id,
-        userId: ragDocument.userId,
+        userId: ragDocument.user_id,
         originalFileName: ragDocument.originalFileName,
         fileSize: ragDocument.fileSize,
         contentType: ragDocument.contentType,
@@ -179,7 +179,7 @@ router.post('/batch', upload.array('files'), async (req: AuthRequest, res) => {
         let ragDocument
         try {
           ragDocument = await azureCosmosService.createRAGDocument({
-            userId,
+            user_id: userId,
             documentId: blobResult.id,
             documentFilePath: blobResult.path,
             isProcessed: false,
