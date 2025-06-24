@@ -53,4 +53,5 @@ export interface RAGProcessingOptions {
   chunkOverlap: number
   generateEmbeddings: boolean
   preserveFormatting: boolean
+  uploadCompleteFile: boolean
 }

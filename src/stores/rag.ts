@@ -69,6 +69,9 @@ export const useRAGStore = defineStore('rag', () => {
     try {
       processing.value = true
       
+      // Import the backend upload service
+      const { externalFileUploadService } = await import('@/services/externalFileUploadService')
+      
       // Create import session
       const session = await RAGService.createImportSession(authStore.user.id, files.length)
       importSessions.value.unshift(session)
@@ -94,20 +97,86 @@ export const useRAGStore = defineStore('rag', () => {
           progressItem.status = 'uploading'
           progressItem.progress = 25
 
-          progressItem.status = 'processing'
-          progressItem.progress = 50
+          // Try to use backend service for upload and processing
+          try {
+            // Upload file to backend service
+            const uploadResult = await externalFileUploadService.uploadFile(
+              file, 
+              authStore.user.id, 
+              undefined, // path parameter
+              {
+                metadata: {
+                  sessionId: session.id,
+                  chunkSize: String(options.chunkSize || 512),
+                  chunkOverlap: String(options.chunkOverlap || 100),
+                  generateEmbeddings: String(options.generateEmbeddings || true),
+                  preserveFormatting: String(options.preserveFormatting || false),
+                  uploadCompleteFile: String(options.uploadCompleteFile || false)
+                }
+              }
+            )
 
-          const document = await RAGService.processDocument(
-            file,
-            authStore.user.id,
-            session.id,
-            options
-          )
+            progressItem.status = 'processing'
+            progressItem.progress = 50
 
-          documents.value.unshift(document)
-          progressItem.status = 'completed'
-          progressItem.progress = 100
-          processedCount++
+            // Trigger file processing asynchronously (fire-and-forget)
+            const { nodeFileUploadService } = await import('@/services/nodeFileUploadService')
+            
+            // Start RAG processing asynchronously without waiting for completion
+            nodeFileUploadService.processRAGDocument(uploadResult.documentId, authStore.user.id, {
+              batchSize: options.chunkSize || 512,
+              transformOptions: options
+            }).catch(error => {
+              console.error(`Async RAG processing failed for document ${uploadResult.documentId}:`, error)
+              // Optionally, you could update the document status in the database here
+              // or emit an event to notify the UI of processing failures
+              throw error
+            })
+
+            // Create document object for local state
+            const document = {
+              id: uploadResult.documentId,
+              user_id: authStore.user.id,
+              filename: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              content: '',
+              status: 'processing' as const,
+              chunk_count: 0,
+              embedding_count: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              metadata: {
+                file_path: uploadResult.path,
+                session_id: session.id,
+                processing_options: options
+              }
+            }
+
+            documents.value.unshift(document)
+            progressItem.status = 'completed'
+            progressItem.progress = 100
+            processedCount++
+
+          } catch (backendError) {
+            console.warn('Backend service not available, falling back to original RAG processing:', backendError)
+            
+            // Fallback to original RAG processing
+            progressItem.status = 'processing'
+            progressItem.progress = 50
+
+            const document = await RAGService.processDocument(
+              file,
+              authStore.user.id,
+              session.id,
+              options
+            )
+
+            documents.value.unshift(document)
+            progressItem.status = 'completed'
+            progressItem.progress = 100
+            processedCount++
+          }
 
         } catch (error) {
           progressItem.status = 'failed'
