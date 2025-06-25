@@ -10,6 +10,7 @@ export interface HealthDocument {
   import_session_id?: string
   processed_at?: string
   created_at: string
+  _partitionKey: string
 }
 
 export interface HealthEmbedding {
@@ -21,6 +22,7 @@ export interface HealthEmbedding {
   chunk_index: number
   metadata: Record<string, any>
   created_at: string
+  _partitionKey: string
 }
 
 export interface ImportSession {
@@ -35,6 +37,7 @@ export interface ImportSession {
   metadata: Record<string, any>
   started_at: string
   completed_at?: string
+  _partitionKey: string
 }
 
 export interface DataSource {
@@ -49,6 +52,7 @@ export interface DataSource {
   configuration: Record<string, any>
   created_at: string
   updated_at: string
+  _partitionKey: string
 }
 
 export interface SimilarContent {
@@ -58,12 +62,14 @@ export interface SimilarContent {
   document_title: string
   document_type: string
   source_app: string
+  _partitionKey: string
 }
 
 export interface HealthDataImport {
   source: string
   data: any[]
   metadata?: Record<string, any>
+  _partitionKey: string
 }
 
 export interface AppleHealthData {
@@ -76,6 +82,7 @@ export interface AppleHealthData {
   sourceVersion?: string
   device?: string
   metadata?: Record<string, any>
+  _partitionKey: string
 }
 
 export interface ProcessedHealthData {
@@ -83,4 +90,5 @@ export interface ProcessedHealthData {
   content: string
   document_type: string
   metadata: Record<string, any>
+  _partitionKey: string
 }

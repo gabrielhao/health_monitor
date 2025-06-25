@@ -230,7 +230,7 @@
           <div class="flex items-center">
             <CheckCircleIcon class="w-8 h-8 text-success-600 mr-3" />
             <div>
-              <p class="text-2xl font-bold text-success-900">{{ ragStore.completedDocuments }}</p>
+              <p class="text-2xl font-bold text-success-900">{{ ragStore.documents.filter(d => d.isProcessed).length }}</p>
               <p class="text-sm text-success-700">Completed</p>
             </div>
           </div>
@@ -240,18 +240,8 @@
           <div class="flex items-center">
             <ClockIcon class="w-8 h-8 text-warning-600 mr-3" />
             <div>
-              <p class="text-2xl font-bold text-warning-900">{{ ragStore.documentsByStatus.processing.length }}</p>
+              <p class="text-2xl font-bold text-warning-900">{{ ragStore.documents.filter(d => !d.isProcessed).length }}</p>
               <p class="text-sm text-warning-700">Processing</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-error-50 border border-error-200 rounded-lg p-4">
-          <div class="flex items-center">
-            <XCircleIcon class="w-8 h-8 text-error-600 mr-3" />
-            <div>
-              <p class="text-2xl font-bold text-error-900">{{ ragStore.failedDocuments }}</p>
-              <p class="text-sm text-error-700">Failed</p>
             </div>
           </div>
         </div>
@@ -281,25 +271,20 @@
           class="flex items-center justify-between p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50"
         >
           <div class="flex items-center space-x-4">
-            <span class="text-2xl">{{ RAGService.getFileIcon(document.file_type) }}</span>
+            <span class="text-2xl">{{ RAGService.getFileIcon(document.contentType || '') }}</span>
             <div>
-              <h3 class="font-medium text-neutral-900">{{ document.filename }}</h3>
+              <h3 class="font-medium text-neutral-900">{{ document.originalFileName || document.documentId }}</h3>
               <div class="flex items-center space-x-4 text-sm text-neutral-500">
-                <span>{{ RAGService.formatFileSize(document.file_size) }}</span>
+                <span>{{ RAGService.formatFileSize(document.fileSize || 0) }}</span>
                 <span v-if="document.metadata?.upload_complete_file">Complete file</span>
-                <span v-else>{{ document.chunk_count }} chunks</span>
-                <span>{{ document.embedding_count }} embeddings</span>
-                <span>{{ formatDate(document.created_at) }}</span>
-              </div>
-              <div v-if="document.error_message" class="text-sm text-error-600 mt-1">
-                Error: {{ document.error_message }}
+                <span>{{ formatDate(document.uploadDate instanceof Date ? document.uploadDate.toISOString() : document.uploadDate) }}</span>
               </div>
             </div>
           </div>
           
           <div class="flex items-center space-x-3">
-            <span :class="`px-2 py-1 rounded-full text-xs ${getDocumentStatusColor(document.status)}`">
-              {{ document.status }}
+            <span :class="`px-2 py-1 rounded-full text-xs ${getDocumentStatusColor(document.isProcessed ? 'completed' : 'processing')}`">
+              {{ document.isProcessed ? 'completed' : 'processing' }}
             </span>
             <button 
               @click="deleteDocument(document.id)"

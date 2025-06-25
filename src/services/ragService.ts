@@ -69,7 +69,8 @@ export class RAGService {
       ...session,
       started_at: this.toRequiredISOString(session.started_at),
       completed_at: this.toISOString(session.completed_at),
-      error_log: session.error_log || []
+      error_log: session.error_log || [],
+      _partitionKey: userId
     }
   }
 
@@ -91,7 +92,8 @@ export class RAGService {
       ...session,
       started_at: this.toRequiredISOString(session.started_at),
       completed_at: this.toISOString(session.completed_at),
-      error_log: session.error_log || []
+      error_log: session.error_log || [],
+      _partitionKey: userId
     }
   }
 
@@ -100,143 +102,6 @@ export class RAGService {
     
     const result = await azureBlob.uploadFile(file, userId, fileName)
     return result.path
-  }
-
-  static async processDocument(
-    file: File,
-    userId: string,
-    sessionId: string,
-    options: RAGProcessingOptions
-  ): Promise<RAGDocument> {
-    try {
-      // Upload file to Azure Blob Storage
-      const filePath = await this.uploadFile(file, userId)
-
-      // Read file content
-      const fileContent = await this.readFileContent(file)
-
-      // Create document record in Cosmos DB
-      const document = await azureCosmos.createRagDocument({
-        user_id: userId,
-        filename: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        content: options.uploadCompleteFile ? fileContent : '', // Store full content if uploading complete file
-        status: 'processing',
-        chunk_count: options.uploadCompleteFile ? 1 : 0, // Complete file counts as 1 chunk
-        embedding_count: 0,
-        metadata: {
-          file_path: filePath,
-          session_id: sessionId,
-          processing_options: options,
-          upload_complete_file: options.uploadCompleteFile
-        },
-        _partitionKey: userId
-      })
-
-      // If uploading complete file, create a single chunk with the entire content
-      if (options.uploadCompleteFile) {
-        // Create single chunk for the entire file
-        const chunk = await azureCosmos.createRagChunk({
-          document_id: document.id,
-          user_id: userId,
-          content: fileContent,
-          embedding: [], // Will be populated if embeddings are generated
-          chunk_index: 0,
-          token_count: this.estimateTokenCount(fileContent),
-          metadata: {
-            is_complete_file: true,
-            file_name: file.name,
-            file_type: file.type
-          },
-          _partitionKey: userId
-        })
-
-        // Generate embedding for the complete file if requested
-        if (options.generateEmbeddings) {
-          try {
-            const embedding = await azureEmbedding.generateSingleEmbedding(fileContent)
-            
-            // Since there's no update method, we'll delete and recreate the chunk with embedding
-            await azureCosmos.deleteRagChunksByDocument(document.id, userId)
-            
-            const updatedChunk = await azureCosmos.createRagChunk({
-              document_id: document.id,
-              user_id: userId,
-              content: fileContent,
-              embedding: embedding,
-              chunk_index: 0,
-              token_count: this.estimateTokenCount(fileContent),
-              metadata: {
-                is_complete_file: true,
-                file_name: file.name,
-                file_type: file.type
-              },
-              _partitionKey: userId
-            })
-
-            // Update document embedding count
-            await azureCosmos.updateRagDocument(document.id, userId, {
-              embedding_count: 1,
-              status: 'completed'
-            })
-          } catch (embeddingError) {
-            console.error('Error generating embedding for complete file:', embeddingError)
-            // Update document with error status
-            await azureCosmos.updateRagDocument(document.id, userId, {
-              status: 'failed',
-              error_message: `Embedding generation failed: ${embeddingError instanceof Error ? embeddingError.message : 'Unknown error'}`
-            })
-          }
-        } else {
-          // Mark as completed without embeddings
-          await azureCosmos.updateRagDocument(document.id, userId, {
-            status: 'completed'
-          })
-        }
-
-        // Convert RagDocument to RAGDocument
-        return {
-          ...document,
-          created_at: this.toRequiredISOString(document.created_at),
-          updated_at: this.toRequiredISOString(document.updated_at),
-          metadata: document.metadata || {}
-        }
-      }
-
-      // Original chunked processing logic
-      // NEW: Try to trigger processing via backend service if available
-      try {
-        const { nodeFileUploadService } = await import('./nodeFileUploadService')
-        await nodeFileUploadService.processRAGDocument(document.id, userId, {
-          batchSize: options.chunkSize || 512,
-          transformOptions: options
-        })
-        console.log('Successfully triggered backend processing for document:', document.id)
-      } catch (backendError) {
-        console.warn('Backend processing not available, falling back to Azure Function:', backendError)
-        
-        // Fallback: Process document via Azure Function
-        const processResult = await this.callAzureFunction('process-rag-document', {
-          documentId: document.id,
-          filePath,
-          options
-        })
-        
-        return processResult.document
-      }
-
-      // Convert RagDocument to RAGDocument
-      return {
-        ...document,
-        created_at: this.toRequiredISOString(document.created_at),
-        updated_at: this.toRequiredISOString(document.updated_at),
-        metadata: document.metadata || {}
-      }
-    } catch (error) {
-      console.error('Document processing failed:', error)
-      throw error
-    }
   }
 
   private static async readFileContent(file: File): Promise<string> {
@@ -281,10 +146,17 @@ export class RAGService {
     
     // Convert RagDocument[] to RAGDocument[]
     return (documents || []).map(doc => ({
-      ...doc,
-      created_at: this.toRequiredISOString(doc.created_at),
-      updated_at: this.toRequiredISOString(doc.updated_at),
-      metadata: doc.metadata || {}
+      id: doc.id,
+      user_id: doc.user_id,
+      documentId: doc.documentId,
+      documentFilePath: doc.documentFilePath,
+      isProcessed: doc.isProcessed,
+      uploadDate: doc.uploadDate,
+      fileSize: doc.fileSize,
+      contentType: doc.contentType,
+      originalFileName: doc.originalFileName,
+      metadata: doc.metadata || {},
+      _partitionKey: doc.user_id
     }))
   }
 
@@ -294,9 +166,10 @@ export class RAGService {
     // Convert RagImportSession[] to RAGImportSession[]
     return (sessions || []).map(session => ({
       ...session,
-      started_at: this.toRequiredISOString(session.started_at),
-      completed_at: this.toISOString(session.completed_at),
-      error_log: session.error_log || []
+      started_at: session.started_at,
+      completed_at: session.completed_at,
+      error_log: session.error_log || [],
+      _partitionKey: session.user_id
     }))
   }
 
@@ -322,8 +195,9 @@ export class RAGService {
     return (similarChunks || []).map(chunk => ({
       ...chunk,
       embedding: chunk.embedding || [],
-      created_at: this.toRequiredISOString(chunk.created_at),
-      metadata: chunk.metadata || {}
+      created_at: chunk.created_at,
+      metadata: chunk.metadata || {},
+      _partitionKey: chunk.user_id
     }))
   }
 

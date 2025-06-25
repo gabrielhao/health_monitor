@@ -1,5 +1,8 @@
-import { Container, CosmosClient, Database } from '@azure/cosmos';
-import type { HealthDocument, HealthEmbedding, ImportSession, RagChunk, RagDocument, RagImportSession } from './azureConfig';
+import type { HealthDocument, HealthEmbedding, ImportSession } from '@/types/index';
+import type { RAGChunk, RAGDocument, RAGImportSession } from '@/types/rag';
+import type { Database, Container } from '@azure/cosmos';
+import type { CosmosClient } from '@azure/cosmos';
+
 import { azureConfig, createCosmosClient } from './azureConfig';
 
 class AzureCosmosService {
@@ -83,7 +86,7 @@ class AzureCosmosService {
         const newDocument: HealthDocument = {
             id: `health_doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             ...document,
-            created_at: new Date(),
+            created_at: new Date().toISOString(),
             _partitionKey: document.user_id,
         };
 
@@ -156,7 +159,7 @@ class AzureCosmosService {
         const newEmbedding: HealthEmbedding = {
             id: `embedding_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             ...embedding,
-            created_at: new Date(),
+            created_at: new Date().toISOString(),
             _partitionKey: embedding.user_id,
         };
 
@@ -239,7 +242,7 @@ class AzureCosmosService {
         const newSession: ImportSession = {
             id: `import_session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             ...session,
-            started_at: new Date(),
+            started_at: new Date().toISOString(),
             _partitionKey: session.user_id,
         };
 
@@ -282,25 +285,24 @@ class AzureCosmosService {
     }
 
     // RAG Documents Operations
-    async createRagDocument(document: Omit<RagDocument, 'id' | 'created_at' | 'updated_at'>): Promise<RagDocument> {
+    async createRagDocument(document: Omit<RAGDocument, 'id'>): Promise<RAGDocument> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragDocuments);
 
-        const newDocument: RagDocument = {
+        const newDocument: RAGDocument = {
             id: `rag_doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             ...document,
-            created_at: new Date(),
-            updated_at: new Date(),
+            uploadDate: new Date(),
             _partitionKey: document.user_id,
         };
 
         const { resource } = await container.items.create(newDocument);
-        return resource as RagDocument;
+        return resource as RAGDocument;
     }
 
-    async updateRagDocument(documentId: string, userId: string, updates: Partial<RagDocument>): Promise<RagDocument> {
+    async updateRagDocument(documentId: string, userId: string, updates: Partial<RAGDocument>): Promise<RAGDocument> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragDocuments);
 
-        const { resource: currentDoc } = await container.item(documentId, userId).read<RagDocument>();
+        const { resource: currentDoc } = await container.item(documentId, userId).read<RAGDocument>();
         if (!currentDoc) {
             throw new Error(`RAG document ${documentId} not found`);
         }
@@ -308,48 +310,46 @@ class AzureCosmosService {
         const updatedDocument = {
             ...currentDoc,
             ...updates,
-            updated_at: new Date(),
+            updated_at: new Date().toISOString(),
             _partitionKey: userId,
         };
 
         const { resource } = await container.item(documentId, userId).replace(updatedDocument);
-        return resource as RagDocument;
+        return resource as RAGDocument;
     }
 
     // RAG Chunks Operations
-    async createRagChunk(chunk: Omit<RagChunk, 'id' | 'created_at'>): Promise<RagChunk> {
+    async createRagChunk(chunk: Omit<RAGChunk, 'id' | 'created_at'>): Promise<RAGChunk> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragChunks);
 
-        const newChunk: RagChunk = {
+        const newChunk: RAGChunk = {
             id: `rag_chunk_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             ...chunk,
-            created_at: new Date(),
-            _partitionKey: chunk.user_id,
+            created_at: new Date().toISOString()
         };
 
         const { resource } = await container.items.create(newChunk);
-        return resource as RagChunk;
+        return resource as RAGChunk;
     }
 
     // RAG Import Sessions Operations
-    async createRagImportSession(session: Omit<RagImportSession, 'id' | 'started_at'>): Promise<RagImportSession> {
+    async createRagImportSession(session: Omit<RAGImportSession, 'id' | 'started_at'>): Promise<RAGImportSession> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragImportSessions);
 
-        const newSession: RagImportSession = {
+        const newSession: RAGImportSession = {
             id: `rag_import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             ...session,
-            started_at: new Date(),
-            _partitionKey: session.user_id,
+            started_at: new Date().toISOString()
         };
 
         const { resource } = await container.items.create(newSession);
-        return resource as RagImportSession;
+        return resource as RAGImportSession;
     }
 
-    async updateRagImportSession(sessionId: string, userId: string, updates: Partial<RagImportSession>): Promise<RagImportSession> {
+    async updateRagImportSession(sessionId: string, userId: string, updates: Partial<RAGImportSession>): Promise<RAGImportSession> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragImportSessions);
 
-        const { resource: currentSession } = await container.item(sessionId, userId).read<RagImportSession>();
+        const { resource: currentSession } = await container.item(sessionId, userId).read<RAGImportSession>();
         if (!currentSession) {
             throw new Error(`RAG import session ${sessionId} not found`);
         }
@@ -361,10 +361,11 @@ class AzureCosmosService {
         };
 
         const { resource } = await container.item(sessionId, userId).replace(updatedSession);
-        return resource as RagImportSession;
+        return resource as RAGImportSession;
     }
 
-    async getRagDocuments(userId: string, options?: { limit?: number }): Promise<RagDocument[]> {
+    async getRagDocuments(userId: string, options?: { limit?: number }): Promise<RAGDocument[]> {
+        console.log("[Cosmos] getRagDocuments", userId, options);
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragDocuments);
 
         const query = `
@@ -386,10 +387,10 @@ class AzureCosmosService {
             )
             .fetchAll();
 
-        return resources as RagDocument[];
+        return resources as RAGDocument[];
     }
 
-    async getRagImportSessions(userId: string): Promise<RagImportSession[]> {
+    async getRagImportSessions(userId: string): Promise<RAGImportSession[]> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragImportSessions);
 
         const query = `
@@ -410,10 +411,10 @@ class AzureCosmosService {
             )
             .fetchAll();
 
-        return resources as RagImportSession[];
+        return resources as RAGImportSession[];
     }
 
-    async searchSimilarRagChunks(queryEmbedding: number[], userId: string, options?: { threshold?: number; limit?: number }): Promise<RagChunk[]> {
+    async searchSimilarRagChunks(queryEmbedding: number[], userId: string, options?: { threshold?: number; limit?: number }): Promise<RAGChunk[]> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragChunks);
 
         // Simple implementation - in production, you'd want vector similarity search
@@ -435,7 +436,7 @@ class AzureCosmosService {
             )
             .fetchAll();
 
-        return resources as RagChunk[];
+        return resources as RAGChunk[];
     }
 
     async deleteRagDocument(documentId: string, userId: string): Promise<void> {

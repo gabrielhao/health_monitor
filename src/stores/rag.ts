@@ -16,12 +16,11 @@ export const useRAGStore = defineStore('rag', () => {
   const documentsByStatus = computed(() => {
     const grouped: Record<string, RAGDocument[]> = {
       completed: [],
-      processing: [],
-      failed: []
+      unprocessed: []
     }
     
     documents.value.forEach(doc => {
-      grouped[doc.status].push(doc)
+      grouped[doc.isProcessed ? 'completed' : 'unprocessed'].push(doc)
     })
     
     return grouped
@@ -29,7 +28,7 @@ export const useRAGStore = defineStore('rag', () => {
 
   const totalDocuments = computed(() => documents.value.length)
   const completedDocuments = computed(() => documentsByStatus.value.completed.length)
-  const failedDocuments = computed(() => documentsByStatus.value.failed.length)
+  const unprocessedDocuments = computed(() => documentsByStatus.value.unprocessed.length)
 
   const fetchDocuments = async () => {
     if (!authStore.user) return
@@ -137,20 +136,17 @@ export const useRAGStore = defineStore('rag', () => {
             const document = {
               id: uploadResult.documentId,
               user_id: authStore.user.id,
-              filename: file.name,
-              file_type: file.type,
-              file_size: file.size,
+              documentId: uploadResult.documentId,
+              documentFilePath: uploadResult.path,
               content: '',
-              status: 'processing' as const,
-              chunk_count: 0,
-              embedding_count: 0,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
+              isProcessed: false,
+              uploadDate: new Date(),
               metadata: {
                 file_path: uploadResult.path,
                 session_id: session.id,
                 processing_options: options
-              }
+              },
+              _partitionKey: authStore.user.id
             }
 
             documents.value.unshift(document)
@@ -159,23 +155,8 @@ export const useRAGStore = defineStore('rag', () => {
             processedCount++
 
           } catch (backendError) {
-            console.warn('Backend service not available, falling back to original RAG processing:', backendError)
-            
-            // Fallback to original RAG processing
-            progressItem.status = 'processing'
-            progressItem.progress = 50
-
-            const document = await RAGService.processDocument(
-              file,
-              authStore.user.id,
-              session.id,
-              options
-            )
-
-            documents.value.unshift(document)
-            progressItem.status = 'completed'
-            progressItem.progress = 100
-            processedCount++
+            console.warn('Backend service not available', backendError)
+            throw backendError
           }
 
         } catch (error) {
@@ -255,7 +236,7 @@ export const useRAGStore = defineStore('rag', () => {
     documentsByStatus,
     totalDocuments,
     completedDocuments,
-    failedDocuments,
+    unprocessedDocuments,
     fetchDocuments,
     fetchImportSessions,
     processFiles,
