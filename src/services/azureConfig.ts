@@ -4,6 +4,8 @@ import { SecretClient } from '@azure/keyvault-secrets';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { BlobServiceClient } from '@azure/storage-blob';
 import { OpenAI } from 'openai';
+import type { UserProfile, HealthDocument, HealthEmbedding, ImportSession, DataSource } from '@/types/index';
+import type { RAGDocument, RAGChunk, RAGImportSession } from '@/types/rag';
 
 // Azure configuration
 const azureConfig = {
@@ -126,127 +128,8 @@ export interface CosmosDatabase {
     health_embeddings: HealthEmbedding;
     import_sessions: ImportSession;
     data_sources: DataSource;
-    rag_documents: RagDocument;
-    rag_chunks: RagChunk;
-    rag_import_sessions: RagImportSession;
+    rag_documents: RAGDocument;
+    rag_chunks: RAGChunk;
+    rag_import_sessions: RAGImportSession;
 }
 
-export interface UserProfile {
-    id: string;
-    email: string;
-    full_name?: string;
-    avatar_url?: string;
-    date_of_birth?: string;
-    gender?: string;
-    height?: number;
-    weight?: number;
-    emergency_contact?: string;
-    medical_conditions?: Record<string, any>;
-    medications?: Record<string, any>;
-    privacy_settings?: Record<string, any>;
-    created_at: Date;
-    updated_at: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface HealthDocument {
-    id: string;
-    user_id: string;
-    source_app: string;
-    document_type: string;
-    title: string;
-    content: string;
-    metadata?: Record<string, any>;
-    file_path?: string;
-    import_session_id?: string;
-    processed_at?: Date;
-    created_at: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface HealthEmbedding {
-    id: string;
-    user_id: string;
-    document_id: string;
-    content_chunk: string;
-    embedding: number[];
-    chunk_index: number;
-    metadata?: Record<string, any>;
-    created_at: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface ImportSession {
-    id: string;
-    user_id: string;
-    source_app: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed';
-    total_records: number;
-    processed_records: number;
-    failed_records: number;
-    error_log?: string[];
-    metadata?: Record<string, any>;
-    started_at: Date;
-    completed_at?: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface DataSource {
-    id: string;
-    user_id: string;
-    source_type: string;
-    source_name: string;
-    is_active: boolean;
-    last_sync_at?: Date;
-    sync_frequency: 'manual' | 'daily' | 'weekly';
-    auth_token_encrypted?: string;
-    configuration?: Record<string, any>;
-    created_at: Date;
-    updated_at: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface RagDocument {
-    id: string;
-    user_id: string;
-    filename: string;
-    file_type: string;
-    file_size: number;
-    content: string;
-    status: 'processing' | 'completed' | 'failed';
-    error_message?: string;
-    chunk_count: number;
-    embedding_count: number;
-    metadata?: Record<string, any>;
-    created_at: Date;
-    updated_at: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface RagChunk {
-    id: string;
-    document_id: string;
-    user_id: string;
-    content: string;
-    embedding?: number[];
-    chunk_index: number;
-    token_count: number;
-    metadata?: Record<string, any>;
-    created_at: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}
-
-export interface RagImportSession {
-    id: string;
-    user_id: string;
-    total_files: number;
-    processed_files: number;
-    failed_files: number;
-    total_chunks: number;
-    total_embeddings: number;
-    status: 'processing' | 'completed' | 'failed';
-    error_log?: string[];
-    started_at: Date;
-    completed_at?: Date;
-    _partitionKey: string; // Cosmos DB partition key - using user_id
-}

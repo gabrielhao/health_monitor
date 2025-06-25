@@ -1,17 +1,15 @@
 export interface RAGDocument {
   id: string
   user_id: string
-  filename: string
-  file_type: string
-  file_size: number
-  content: string
-  status: 'processing' | 'completed' | 'failed'
-  error_message?: string
-  chunk_count: number
-  embedding_count: number
-  metadata: Record<string, any>
-  created_at: string
-  updated_at: string
+  documentId: string
+  documentFilePath: string
+  isProcessed: boolean
+  uploadDate: Date
+  originalFileName?: string
+  fileSize?: number
+  contentType?: string
+  metadata?: Record<string, any>
+  _partitionKey: string
 }
 
 export interface RAGChunk {
@@ -24,6 +22,7 @@ export interface RAGChunk {
   token_count: number
   metadata: Record<string, any>
   created_at: string
+  _partitionKey: string
 }
 
 export interface RAGImportSession {
@@ -38,6 +37,7 @@ export interface RAGImportSession {
   error_log: any[]
   started_at: string
   completed_at?: string
+  _partitionKey: string
 }
 
 export interface FileUploadProgress {
