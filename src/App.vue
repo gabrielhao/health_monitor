@@ -57,11 +57,11 @@ onUnmounted(() => {
   height: 100vh;
   z-index: 0;
   pointer-events: none; 
-  background: url('@/assets/zhiyuan-sun-moixNMJcVk8-unsplash.jpg') center
+  background: url('@/assets/1amfcs-30xiHyXbyb4-unsplash.jpg') center
     center/cover no-repeat;
   filter: blur(10px);
 }
-
+/* /Users/guangzhengli/code/aivital/health_monitor/src/assets/1amfcs-30xiHyXbyb4-unsplash.jpg */
 
 #app > *:not(.home-bg) {
   position: relative;
