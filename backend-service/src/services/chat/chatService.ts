@@ -45,7 +45,7 @@ class ChatService {
       // Load configuration from environment variables
       this.config = {
         endpoint: process.env.AZURE_OPENAI_CHAT_ENDPOINT || "https://health-monitor-openai.openai.azure.com/",
-        apiKey: process.env.AZURE_OPENAI_CHAT_KEY || "",
+        apiKey: process.env.AZURE_OPENAI_CHAT_API_KEY || "",
         deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "o4-mini",
         apiVersion: process.env.AZURE_OPENAI_CHAT_API_VERSION || "2024-12-01-preview",
         modelName: process.env.AZURE_OPENAI_CHAT_MODEL || "o4-mini"
@@ -99,7 +99,7 @@ class ChatService {
         messages: messages.map(msg => ({ role: msg.role, content: msg.content })),
         model: this.config.modelName,
         max_completion_tokens: request.maxTokens || 100000,
-        temperature: request.temperature || 0.7
+        temperature: request.temperature || 1
       };
 
       // Call Azure OpenAI
@@ -172,7 +172,7 @@ class ChatService {
         messages: messages.map(msg => ({ role: msg.role, content: msg.content })),
         model: this.config.modelName,
         max_completion_tokens: request.maxTokens || 100000,
-        temperature: request.temperature || 0.7,
+        temperature: request.temperature || 1,
         stream: true
       };
 
