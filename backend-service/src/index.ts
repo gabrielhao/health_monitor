@@ -12,6 +12,7 @@ import { initializeUploadService } from './services/upload/index.js'
 import { initializeProcessingService } from './services/processing/index.js'
 import { initializeEmbeddingService } from './services/embedding/index.js'
 import { initializeChatService } from './services/chat/index.js'
+import { initializeHealthService } from './services/health/index.js'
 import { azureCosmosService } from './shared/services/azureCosmosService.js'
 
 // Import routes
@@ -19,6 +20,7 @@ import uploadRoutes from './services/upload/routes/upload.js'
 import processingRoutes from './services/processing/routes/processing.js'
 import embeddingRoutes from './services/embedding/routes/embedding.js'
 import chatRoutes from './services/chat/routes/chat.js'
+import healthRoutes from './services/health/routes/health.js'
 
 const app = express()
 const port = process.env.PORT || 3001
@@ -62,6 +64,7 @@ app.get('/health', (req, res) => {
         processing: 'active',
         embedding: 'active',
         chat: 'active'
+        health: 'active'
       }
     }
   })
@@ -72,6 +75,7 @@ app.use('/api/upload', uploadRoutes)
 app.use('/api/processing', processingRoutes)
 app.use('/api/embedding', embeddingRoutes)
 app.use('/api/chat', chatRoutes)
+app.use('/api/health', healthRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -104,6 +108,7 @@ async function startServer() {
     await initializeProcessingService()
     await initializeEmbeddingService()
     await initializeChatService()
+    initializeHealthService()
     
     console.log('All services initialized successfully')
     
@@ -115,6 +120,7 @@ async function startServer() {
       console.log(`Processing API: http://localhost:${port}/api/processing`)
       console.log(`Embedding API: http://localhost:${port}/api/embedding`)
       console.log(`Chat API: http://localhost:${port}/api/chat`)
+      console.log(`Health Metrics API: http://localhost:${port}/api/health`)
     })
     
   } catch (error) {
