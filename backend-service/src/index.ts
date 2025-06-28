@@ -10,11 +10,13 @@ import rateLimit from 'express-rate-limit'
 // Import services
 import { initializeUploadService } from './services/upload/index.js'
 import { initializeProcessingService } from './services/processing/index.js'
+import { initializeEmbeddingService } from './services/embedding/index.js'
 import { azureCosmosService } from './shared/services/azureCosmosService.js'
 
 // Import routes
 import uploadRoutes from './services/upload/routes/upload.js'
 import processingRoutes from './services/processing/routes/processing.js'
+import embeddingRoutes from './services/embedding/routes/embedding.js'
 
 const app = express()
 const port = process.env.PORT || 3001
@@ -55,7 +57,8 @@ app.get('/health', (req, res) => {
       timestamp: new Date().toISOString(),
       services: {
         upload: 'active',
-        processing: 'active'
+        processing: 'active',
+        embedding: 'active'
       }
     }
   })
@@ -64,6 +67,7 @@ app.get('/health', (req, res) => {
 // Service routes
 app.use('/api/upload', uploadRoutes)
 app.use('/api/processing', processingRoutes)
+app.use('/api/embedding', embeddingRoutes)
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -94,6 +98,7 @@ async function startServer() {
     // Initialize services
     initializeUploadService()
     await initializeProcessingService()
+    await initializeEmbeddingService()
     
     console.log('All services initialized successfully')
     
@@ -103,6 +108,7 @@ async function startServer() {
       console.log(`Health check: http://localhost:${port}/health`)
       console.log(`Upload API: http://localhost:${port}/api/upload`)
       console.log(`Processing API: http://localhost:${port}/api/processing`)
+      console.log(`Embedding API: http://localhost:${port}/api/embedding`)
     })
     
   } catch (error) {

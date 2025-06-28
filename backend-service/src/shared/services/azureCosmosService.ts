@@ -1,5 +1,5 @@
 import { CosmosClient, Database, Container } from '@azure/cosmos'
-import type { HealthMetric, RAGDocument } from '../types/index.js'
+import type { HealthMetric, RAGDocument, EmbeddingDocument } from '../types/index.js'
 
 // Container configuration interface
 interface ContainerConfig {
@@ -22,6 +22,12 @@ const CONTAINER_CONFIGS: Record<string, ContainerConfig> = {
     partitionKey: '/user_id', // Should match the actual field name in RAGDocument
     envVarName: 'AZURE_COSMOS_CONTAINER_RAG_DOCUMENTS',
     defaultName: 'rag_documents'
+  },
+  healthEmbeddings: {
+    name: 'healthEmbeddings',
+    partitionKey: '/user_id',
+    envVarName: 'AZURE_COSMOS_CONTAINER_HEALTH_EMBEDDINGS',
+    defaultName: 'health_embeddings'
   }
   // Future containers can be easily added here:
   // userProfiles: {
@@ -61,7 +67,7 @@ export class AzureCosmosService {
 
   private async initializeDatabase(): Promise<Database> {
     if (!this.database) {
-      const databaseName = process.env.AZURE_COSMOS_DATABASE || 'health-monitor'
+      const databaseName = process.env.AZURE_COSMOS_DATABASE || 'health-monitor-db'
       this.database = this.cosmosClient!.database(databaseName)
       
       try {
@@ -276,12 +282,13 @@ export class AzureCosmosService {
     }
   }
 
-  async getRAGDocument(documentId: string): Promise<RAGDocument | null> {
+  async getRAGDocument(documentId: string, userId: string): Promise<RAGDocument | null> {
     this.ensureConnection()
     const container = this.getContainer('ragDocuments')
-    
+    console.log('container', container)
     try {
-      const response = await container.item(documentId).read()
+      const response = await container.item(documentId, userId).read()
+      console.log('response', response)
       return response.resource as RAGDocument
     } catch (error) {
       console.error(`[CosmosDB] Error getting RAG document ${documentId}:`, error)
@@ -396,6 +403,112 @@ export class AzureCosmosService {
   // Get available container configurations
   getAvailableContainers(): string[] {
     return Array.from(this.containers.keys())
+  }
+
+  // Embedding Operations
+  async createEmbeddingDocument(document: EmbeddingDocument): Promise<EmbeddingDocument> {
+    this.ensureConnection()
+    const container = this.getContainer('healthEmbeddings')
+    
+    const response = await container.items.create(document)
+    return response.resource as EmbeddingDocument
+  }
+
+  async createEmbeddingDocumentsBatch(documents: EmbeddingDocument[]): Promise<EmbeddingDocument[]> {
+    this.ensureConnection()
+    const container = this.getContainer('healthEmbeddings')
+    
+    // Create documents individually for now (bulk operations have type issues)
+    const createdDocuments: EmbeddingDocument[] = []
+    for (const document of documents) {
+      const response = await container.items.create(document)
+      createdDocuments.push(response.resource as EmbeddingDocument)
+    }
+
+    console.log(`[CosmosDB] Successfully stored ${createdDocuments.length} embedding documents`)
+    return createdDocuments
+  }
+
+  async getEmbeddingDocuments(
+    userId: string,
+    options: {
+      documentId?: string
+      limit?: number
+    } = {}
+  ): Promise<EmbeddingDocument[]> {
+    this.ensureConnection()
+    const container = this.getContainer('healthEmbeddings')
+    
+    let query = 'SELECT * FROM c WHERE c.user_id = @userId'
+    const parameters = [{ name: '@userId', value: userId }]
+
+    if (options.documentId) {
+      query += ' AND c.document_id = @documentId'
+      parameters.push({ name: '@documentId', value: options.documentId })
+    }
+
+    query += ' ORDER BY c.document_id, c.chunk_index'
+
+    if (options.limit) {
+      query += ` OFFSET 0 LIMIT ${options.limit}`
+    }
+
+    const { resources } = await container.items.query<EmbeddingDocument>({
+      query,
+      parameters
+    }, {
+      partitionKey: userId
+    }).fetchAll()
+
+    return resources
+  }
+
+  async deleteEmbeddingDocuments(userId: string, documentId?: string): Promise<void> {
+    this.ensureConnection()
+    const container = this.getContainer('healthEmbeddings')
+    
+    let query = 'SELECT c.id FROM c WHERE c.user_id = @userId'
+    const parameters = [{ name: '@userId', value: userId }]
+
+    if (documentId) {
+      query += ' AND c.document_id = @documentId'
+      parameters.push({ name: '@documentId', value: documentId })
+    }
+
+    const { resources } = await container.items.query({
+      query,
+      parameters
+    }, {
+      partitionKey: userId
+    }).fetchAll()
+
+    for (const resource of resources) {
+      await container.item(resource.id, userId).delete()
+    }
+
+    console.log(`[CosmosDB] Deleted ${resources.length} embedding documents for user ${userId}${documentId ? ` and document ${documentId}` : ''}`)
+  }
+
+  async getEmbeddingDocumentsCount(userId: string, documentId?: string): Promise<number> {
+    this.ensureConnection()
+    const container = this.getContainer('healthEmbeddings')
+    
+    let query = 'SELECT VALUE COUNT(1) FROM c WHERE c.user_id = @userId'
+    const parameters = [{ name: '@userId', value: userId }]
+
+    if (documentId) {
+      query += ' AND c.document_id = @documentId'
+      parameters.push({ name: '@documentId', value: documentId })
+    }
+
+    const { resources } = await container.items.query({
+      query,
+      parameters
+    }, {
+      partitionKey: userId
+    }).fetchAll()
+
+    return resources[0] || 0
   }
 }
 
