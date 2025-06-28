@@ -1,8 +1,24 @@
-import { defineStore } from 'pinia'
-import { ref, computed, readonly } from 'vue'
-import { azureCosmos } from '@/services/azureCosmos'
+import { backendHealthService } from '@/services/backendHealthService'
 import type { HealthMetric, MetricType } from '@/types'
+import { defineStore } from 'pinia'
+import { computed, readonly, ref } from 'vue'
 import { useAuthStore } from './auth'
+
+// Helper function to convert backend response to frontend HealthMetric format
+const mapBackendToFrontendMetric = (backendMetric: any): HealthMetric => {
+  return {
+    id: backendMetric.id || `${backendMetric.metricType}-${backendMetric.timestamp}`,
+    user_id: backendMetric.userId || '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6',
+    metric_type: backendMetric.metricType as MetricType,
+    value: typeof backendMetric.value === 'number' ? backendMetric.value : parseFloat(backendMetric.value?.toString() || '0'),
+    unit: backendMetric.unit || '',
+    systolic: backendMetric.systolic,
+    diastolic: backendMetric.diastolic,
+    notes: backendMetric.notes,
+    recorded_at: typeof backendMetric.timestamp === 'string' ? backendMetric.timestamp : backendMetric.timestamp?.toISOString() || new Date().toISOString(),
+    created_at: typeof backendMetric.timestamp === 'string' ? backendMetric.timestamp : backendMetric.timestamp?.toISOString() || new Date().toISOString(),
+  }
+}
 
 export const useHealthStore = defineStore('health', () => {
   const authStore = useAuthStore()
@@ -26,51 +42,44 @@ export const useHealthStore = defineStore('health', () => {
   const latestMetrics = computed(() => {
     const latest: Record<MetricType, HealthMetric> = {} as Record<MetricType, HealthMetric>
     
-    Object.entries(metricsByType.value).forEach(([type, typeMetrics]) => {
+    Object.entries(metricsByType.value).forEach(([metricType, typeMetrics]) => {
       const sorted = [...typeMetrics].sort((a, b) => 
         new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
       )
       if (sorted.length > 0) {
-        latest[type as MetricType] = sorted[0]
+        latest[metricType as MetricType] = sorted[0]
       }
     })
     
     return latest
   })
 
-  // Fetch metrics
+  // Fetch metrics from backend
   const fetchMetrics = async (metricType?: MetricType, limit?: number) => {
-    if (!authStore.user) return
+    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
       loading.value = true
       
-      let query = supabase
-        .from('health_metrics')
-        .select('*')
-        .eq('user_id', authStore.user.id)
-        .order('recorded_at', { ascending: false })
-
+      const options: any = {}
       if (metricType) {
-        query = query.eq('metric_type', metricType)
+        options.metricType = metricType
       }
-
       if (limit) {
-        query = query.limit(limit)
+        options.limit = limit
       }
 
-      const { data, error } = await query
-
-      if (error) throw error
+      const backendMetrics = await backendHealthService.getHealthMetrics(userId, options)
+      const frontendMetrics = backendMetrics.map(mapBackendToFrontendMetric)
 
       if (metricType || limit) {
         // If filtering, don't replace all metrics
-        return data
+        return frontendMetrics
       } else {
-        metrics.value = data || []
+        metrics.value = frontendMetrics
       }
       
-      return data
+      return frontendMetrics
     } catch (error) {
       console.error('Error fetching metrics:', error)
       throw error
@@ -79,81 +88,65 @@ export const useHealthStore = defineStore('health', () => {
     }
   }
 
-  // Add metric
+  // Get metrics count from backend
+  const getMetricsCount = async (): Promise<number> => {
+    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+
+    try {
+      return await backendHealthService.getMetricsCount(userId)
+    } catch (error) {
+      console.error('Error getting metrics count:', error)
+      return 0
+    }
+  }
+
+  // Get metric types from backend
+  const getMetricTypes = async (): Promise<string[]> => {
+    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+
+    try {
+      return await backendHealthService.getMetricTypes(userId)
+    } catch (error) {
+      console.error('Error getting metric types:', error)
+      return []
+    }
+  }
+
+  // Get aggregated metrics from backend
+  const getAggregatedMetrics = async (
+    metricType: MetricType,
+    aggregationType: 'avg' | 'sum' | 'min' | 'max' | 'count',
+    options: { startDate?: Date; endDate?: Date } = {}
+  ): Promise<{ value: number; count: number }> => {
+    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+
+    try {
+      return await backendHealthService.getAggregatedMetrics(
+        userId,
+        metricType,
+        aggregationType,
+        options
+      )
+    } catch (error) {
+      console.error('Error getting aggregated metrics:', error)
+      return { value: 0, count: 0 }
+    }
+  }
+
+  // Placeholder functions for future implementation
   const addMetric = async (metricData: Omit<HealthMetric, 'id' | 'user_id' | 'created_at'>) => {
-    if (!authStore.user) throw new Error('Not authenticated')
-
-    try {
-      loading.value = true
-      
-      const { data, error } = await supabase
-        .from('health_metrics')
-        .insert({
-          ...metricData,
-          user_id: authStore.user.id,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      metrics.value.unshift(data)
-      return data
-    } catch (error) {
-      console.error('Error adding metric:', error)
-      throw error
-    } finally {
-      loading.value = false
-    }
+    console.warn('Add metric not implemented yet - backend POST endpoint needed')
+    throw new Error('Add metric not implemented yet')
   }
 
-  // Update metric
   const updateMetric = async (id: string, updates: Partial<HealthMetric>) => {
-    try {
-      loading.value = true
-      
-      const { data, error } = await supabase
-        .from('health_metrics')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
-
-      if (error) throw error
-
-      const index = metrics.value.findIndex(m => m.id === id)
-      if (index !== -1) {
-        metrics.value[index] = data
-      }
-
-      return data
-    } catch (error) {
-      console.error('Error updating metric:', error)
-      throw error
-    } finally {
-      loading.value = false
-    }
+    console.warn('Update metric not implemented yet - backend PUT endpoint needed')
+    throw new Error('Update metric not implemented yet')
   }
 
-  // Delete metric
   const deleteMetric = async (id: string) => {
-    try {
-      loading.value = true
-      
-      const { error } = await supabase
-        .from('health_metrics')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
-      metrics.value = metrics.value.filter(m => m.id !== id)
-    } catch (error) {
-      console.error('Error deleting metric:', error)
-      throw error
-    } finally {
-      loading.value = false
-    }
+    console.warn('Delete metric not implemented yet - backend DELETE endpoint needed')
+    throw new Error('Delete metric not implemented yet')
   }
 
   // Get metrics for date range
@@ -162,21 +155,16 @@ export const useHealthStore = defineStore('health', () => {
     startDate: string,
     endDate: string
   ) => {
-    if (!authStore.user) return []
+    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
-      const { data, error } = await supabase
-        .from('health_metrics')
-        .select('*')
-        .eq('user_id', authStore.user.id)
-        .eq('metric_type', metricType)
-        .gte('recorded_at', startDate)
-        .lte('recorded_at', endDate)
-        .order('recorded_at', { ascending: true })
-
-      if (error) throw error
-
-      return data || []
+      const backendMetrics = await backendHealthService.getHealthMetrics(userId, {
+        metricType,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate)
+      })
+      
+      return backendMetrics.map(mapBackendToFrontendMetric)
     } catch (error) {
       console.error('Error fetching metrics for date range:', error)
       throw error
@@ -189,6 +177,9 @@ export const useHealthStore = defineStore('health', () => {
     metricsByType,
     latestMetrics,
     fetchMetrics,
+    getMetricsCount,
+    getMetricTypes,
+    getAggregatedMetrics,
     addMetric,
     updateMetric,
     deleteMetric,
