@@ -149,7 +149,7 @@ const closeNavigation = () => {
 const handleSignOut = async () => {
   try {
     await authStore.signOut();
-    router.push('/auth');
+    router.push('/');
   } catch (error) {
     console.error('Error signing out:', error);
   }

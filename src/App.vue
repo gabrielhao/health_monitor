@@ -10,7 +10,7 @@
     </div>
 
     <template v-else>
-      <div class="bg-gradient-to-br from-[#0068d7] to-[#4adc75]">
+      <div>
         <AppNavigation v-if="authStore.isAuthenticated" />
 
         <main :class="{ 'pl-64': authStore.isAuthenticated && !isMobile }">

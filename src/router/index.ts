@@ -11,12 +11,6 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
-      path: '/auth',
-      name: 'Auth',
-      component: () => import('@/pages/AuthPage.vue'),
-      meta: { requiresGuest: true }
-    },
-    {
       path: '/dashboard',
       name: 'Dashboard',
       component: () => import('@/pages/DashboardPage.vue'),
@@ -80,11 +74,7 @@ router.beforeEach(async (to) => {
 
   // Check auth requirements
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return { name: 'Auth' }
-  }
-
-  if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    return { name: 'Dashboard' }
+    return { name: 'Home' }
   }
 })
 
