@@ -53,6 +53,7 @@ export type MetricType =
   | 'exercise_minutes'
   | 'water_intake'
   | 'mood_score'
+  | 'physical_effort'
 
 export interface ChatMessage {
   id: string

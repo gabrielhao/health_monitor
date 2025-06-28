@@ -57,6 +57,7 @@ export const useHealthStore = defineStore('health', () => {
   // Fetch metrics from backend
   const fetchMetrics = async (metricType?: MetricType, limit?: number) => {
     // Get user ID from auth store with fallback
+    // TODO: Get user ID from auth store
     const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
     
     console.log('Using user ID for health metrics:', userId)
@@ -95,6 +96,8 @@ export const useHealthStore = defineStore('health', () => {
 
   // Get metrics count from backend
   const getMetricsCount = async (): Promise<number> => {
+    
+    // TODO: Get user ID from auth store
     const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
@@ -107,6 +110,8 @@ export const useHealthStore = defineStore('health', () => {
 
   // Get metric types from backend
   const getMetricTypes = async (): Promise<string[]> => {
+    
+    // TODO: Get user ID from auth store
     const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
@@ -123,6 +128,8 @@ export const useHealthStore = defineStore('health', () => {
     aggregationType: 'avg' | 'sum' | 'min' | 'max' | 'count',
     options: { startDate?: Date; endDate?: Date } = {}
   ): Promise<{ value: number; count: number }> => {
+    
+    // TODO: Get user ID from auth store
     const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
@@ -160,6 +167,8 @@ export const useHealthStore = defineStore('health', () => {
     startDate: string,
     endDate: string
   ) => {
+    
+    // TODO: Get user ID from auth store
     const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
