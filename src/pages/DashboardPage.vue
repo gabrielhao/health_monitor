@@ -231,7 +231,7 @@ const quickStats = ref([
     iconColor: 'text-secondary-600',
   },
   {
-    title: 'Steps',
+    title: 'Physical Effort',
     value: '--',
     change: 'Loading...',
     changeColor: 'text-neutral-500',
@@ -357,12 +357,12 @@ const updateQuickStats = async () => {
     }
     
     // Update Steps
-    if (latestMetrics.steps) {
-      const steps = latestMetrics.steps;
-      const stepValue = typeof steps.value === 'number' ? steps.value.toLocaleString() : String(steps.value || '0');
+    if (latestMetrics['physical_effort']) {
+      const physical_efforts = latestMetrics['physical_effort'];
+      const physical_effort_value =  physical_efforts.value ? `${physical_efforts.value} ${physical_efforts.unit}` : '--';
       quickStats.value[3] = {
         ...quickStats.value[3],
-        value: stepValue,
+        value: physical_effort_value,
         change: 'Latest reading',
         changeColor: 'text-success-600',
       };
