@@ -43,7 +43,7 @@ export class FileProcessingService {
 
   //process given rag document id, and save the health metrics to the cosmos db
   async processFile(ragDocumentId: string, userId: string, options: ProcessingOptions = {}){
-    const ragDocument = await azureCosmosService.getRAGDocument(ragDocumentId)
+    const ragDocument = await azureCosmosService.getRAGDocument(ragDocumentId, userId)
     if (!ragDocument) {
       throw new Error('RAG document not found')
     }

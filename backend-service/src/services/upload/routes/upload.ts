@@ -208,7 +208,7 @@ router.post('/batch', upload.array('files'), async (req: AuthRequest, res) => {
           blobId: blobResult.id,
           // Document information (what was actually saved)
           documentId: ragDocument.id,
-          userId: ragDocument.userId,
+          userId: ragDocument.user_id,
           originalFileName: ragDocument.originalFileName,
           fileSize: ragDocument.fileSize,
           contentType: ragDocument.contentType,

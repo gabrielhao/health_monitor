@@ -191,4 +191,61 @@ export interface RAGDocument {
   contentType?: string
   metadata?: Record<string, any>
   _partitionKey: string
+}
+
+// Embedding Service Types
+export interface AppleHealthRecord {
+  readonly '@_type': string;
+  readonly '@_value': string;
+  readonly '@_unit'?: string;
+  readonly '@_startDate': string;
+  readonly '@_endDate'?: string;
+  readonly '@_sourceName'?: string;
+  readonly '@_sourceVersion'?: string;
+  readonly '@_device'?: string;
+  readonly '@_creationDate'?: string;
+}
+
+export interface EmbeddingDocument {
+  readonly id: string;
+  readonly user_id: string;
+  readonly document_id: string;
+  readonly chunk_index: number;
+  readonly content_chunk: string;
+  readonly embedding: number[];
+  readonly metadata: string;
+  readonly timestamp: string;
+  readonly _partitionKey: string;
+}
+
+export interface EmbeddingProcessingResult {
+  readonly processedChunks: number;
+  readonly totalRecords: number;
+  readonly processingTimeMs: number;
+  readonly documentId: string;
+  readonly userId: string;
+}
+
+export interface EmbeddingJob {
+  id: string;
+  userId: string;
+  documentId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress: number;
+  startedAt: Date;
+  completedAt?: Date;
+  error?: string;
+  result?: EmbeddingProcessingResult;
+}
+
+export interface EmbeddingProcessingOptions {
+  batchSize?: number;
+  maxChunkSize?: number;
+  maxTextLength?: number;
+}
+
+export interface CreateEmbeddingRequest {
+  ragDocumentId: string;
+  userId: string;
+  options?: EmbeddingProcessingOptions;
 } 

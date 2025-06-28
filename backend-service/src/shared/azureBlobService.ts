@@ -1,7 +1,7 @@
 import { BlobServiceClient, BlockBlobClient, ContainerClient, BlobSASPermissions } from '@azure/storage-blob'
 import { ClientSecretCredential } from '@azure/identity'
 import { Readable } from 'stream'
-import type { UploadResult, FileMetadata } from '../types/index.js'
+import type { UploadResult, FileMetadata } from './types/index.js'
 
 export class AzureBlobService {
   private blobServiceClient: BlobServiceClient | null = null
