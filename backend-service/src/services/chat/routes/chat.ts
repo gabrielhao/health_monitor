@@ -26,7 +26,7 @@ const conversationIdSchema = z.object({
 });
 
 // Chat completion endpoint
-router.post('/completions', async (req: Request, res: Response) => {
+router.post('', async (req: Request, res: Response) => {
   try {
     const validation = chatRequestSchema.safeParse(req.body);
     
@@ -61,7 +61,7 @@ router.post('/completions', async (req: Request, res: Response) => {
 });
 
 // Streaming chat completion endpoint
-router.post('/completions/stream', async (req: Request, res: Response) => {
+router.post('/stream', async (req: Request, res: Response) => {
   try {
     const validation = chatRequestSchema.safeParse(req.body);
     
