@@ -146,6 +146,7 @@ export class AzureCosmosService {
   }
 
   async createHealthMetricsBatch(metrics: Omit<HealthMetric, 'id'>[]): Promise<HealthMetric[]> {
+    console.log('Creating health metrics batch', metrics.length)
     this.ensureConnection()
     const container = this.getContainer('healthMetrics')
     
@@ -285,10 +286,10 @@ export class AzureCosmosService {
   async getRAGDocument(documentId: string, userId: string): Promise<RAGDocument | null> {
     this.ensureConnection()
     const container = this.getContainer('ragDocuments')
-    console.log('container', container)
+    //console.log('container', container)
     try {
       const response = await container.item(documentId, userId).read()
-      console.log('response', response)
+      //console.log('response', response)
       return response.resource as RAGDocument
     } catch (error) {
       console.error(`[CosmosDB] Error getting RAG document ${documentId}:`, error)

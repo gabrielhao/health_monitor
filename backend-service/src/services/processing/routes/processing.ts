@@ -8,6 +8,7 @@ const router = Router()
 
 // Validation schemas
 const processFileSchema = z.object({
+  userId: z.string(),
   ragDocumentId: z.string(),
   options: z.object({
     batchSize: z.number().optional(),
@@ -25,17 +26,8 @@ const getMetricsSchema = z.object({
 })
 
 // trigger processing of a rag document with given rag document id
-router.post('/process', async (req: Request, res: Response) => {
+router.post('', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.body
-    
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required'
-      } as ApiResponse)
-    }
-    
     const validation = processFileSchema.safeParse(req.body)
     
     if (!validation.success) {
@@ -46,7 +38,7 @@ router.post('/process', async (req: Request, res: Response) => {
       } as ApiResponse)
     }
 
-    const { ragDocumentId, options } = validation.data
+    const { userId, ragDocumentId, options } = validation.data
     const is_success = await fileProcessingService.processFile(ragDocumentId, userId, options)
 
     res.status(202).json({
