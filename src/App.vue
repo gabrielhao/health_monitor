@@ -49,20 +49,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 替换 .home-bg 相关样式为如下 */
+
 .home-bg {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
   z-index: 0;
-  pointer-events: none; /* 保证内容可交互 */
+  pointer-events: none; 
   background: url('@/assets/zhiyuan-sun-moixNMJcVk8-unsplash.jpg') center
     center/cover no-repeat;
   filter: blur(10px);
 }
 
-/* 让内容在背景图之上 */
+
 #app > *:not(.home-bg) {
   position: relative;
   z-index: 1;
@@ -72,7 +72,7 @@ onUnmounted(() => {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.2); /* 可选，增加柔和感 */
+  background: rgba(255, 255, 255, 0.2);
   pointer-events: none;
 }
 </style>
