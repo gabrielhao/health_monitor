@@ -30,7 +30,12 @@
 
     <!-- Metrics List -->
     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <div v-if="healthStore.loading" v-for="i in 6" :key="i" class="animate-pulse">
+      <div
+        v-if="healthStore.loading"
+        v-for="i in 6"
+        :key="i"
+        class="animate-pulse"
+      >
         <div class="metric-card">
           <div class="h-4 bg-neutral-200 rounded w-3/4 mb-3"></div>
           <div class="h-6 bg-neutral-200 rounded w-1/2 mb-2"></div>
@@ -40,10 +45,18 @@
 
       <div v-else-if="filteredMetrics.length === 0" class="col-span-full">
         <div class="text-center py-12">
-          <ClipboardDocumentListIcon class="w-16 h-16 text-neutral-400 mx-auto mb-4" />
-          <h3 class="text-lg font-medium text-neutral-900 mb-2">No metrics found</h3>
-          <p class="text-neutral-500 mb-6">
-            {{ selectedType ? 'No metrics of this type yet.' : 'Start tracking your health by adding your first metric.' }}
+          <ClipboardDocumentListIcon
+            class="w-16 h-16 text-neutral-800 mx-auto mb-4"
+          />
+          <h3 class="text-lg font-medium text-neutral-900 mb-2">
+            No metrics found
+          </h3>
+          <p class="text-neutral-600 mb-6">
+            {{
+              selectedType
+                ? 'No metrics of this type yet.'
+                : 'Start tracking your health by adding your first metric.'
+            }}
           </p>
           <button @click="showAddModal = true" class="btn-primary">
             Add First Metric
@@ -51,29 +64,53 @@
         </div>
       </div>
 
-      <div v-else v-for="metric in filteredMetrics" :key="metric.id" class="metric-card group">
+      <div
+        v-else
+        v-for="metric in filteredMetrics"
+        :key="metric.id"
+        class="metric-card group"
+      >
         <div class="flex items-start justify-between mb-3">
           <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-              <component :is="getMetricIcon(metric.metric_type)" class="w-5 h-5 text-primary-600" />
+            <div
+              class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center"
+            >
+              <component
+                :is="getMetricIcon(metric.metric_type)"
+                class="w-5 h-5 text-primary-600"
+              />
             </div>
             <div>
-              <h3 class="font-medium text-neutral-900">{{ formatMetricType(metric.metric_type) }}</h3>
-              <p class="text-sm text-neutral-500">{{ formatDate(metric.recorded_at) }}</p>
+              <h3 class="font-medium text-neutral-900">
+                {{ formatMetricType(metric.metric_type) }}
+              </h3>
+              <p class="text-sm text-neutral-500">
+                {{ formatDate(metric.recorded_at) }}
+              </p>
             </div>
           </div>
-          <div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <button @click="editMetric(metric)" class="p-1 text-neutral-400 hover:text-neutral-600">
+          <div
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          >
+            <button
+              @click="editMetric(metric)"
+              class="p-1 text-neutral-400 hover:text-neutral-600"
+            >
               <PencilIcon class="w-4 h-4" />
             </button>
-            <button @click="deleteMetricConfirm(metric)" class="p-1 text-neutral-400 hover:text-red-600 ml-1">
+            <button
+              @click="deleteMetricConfirm(metric)"
+              class="p-1 text-neutral-400 hover:text-red-600 ml-1"
+            >
               <TrashIcon class="w-4 h-4" />
             </button>
           </div>
         </div>
 
         <div class="mb-3">
-          <p class="text-2xl font-bold text-neutral-900">{{ formatMetricValue(metric) }}</p>
+          <p class="text-2xl font-bold text-neutral-900">
+            {{ formatMetricValue(metric) }}
+          </p>
         </div>
 
         <div v-if="metric.notes" class="bg-neutral-50 rounded-lg p-3">
@@ -83,7 +120,10 @@
     </div>
 
     <!-- Add/Edit Metric Modal -->
-    <div v-if="showAddModal || editingMetric" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div
+      v-if="showAddModal || editingMetric"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    >
       <div class="bg-white rounded-xl shadow-lg max-w-md w-full p-6">
         <h3 class="text-lg font-semibold text-neutral-900 mb-4">
           {{ editingMetric ? 'Edit Metric' : 'Add New Metric' }}
@@ -97,13 +137,20 @@
               </label>
               <select v-model="form.metric_type" class="input-field" required>
                 <option value="" disabled>Select metric type</option>
-                <option v-for="type in metricTypes" :key="type.value" :value="type.value">
+                <option
+                  v-for="type in metricTypes"
+                  :key="type.value"
+                  :value="type.value"
+                >
                   {{ type.label }}
                 </option>
               </select>
             </div>
 
-            <div v-if="form.metric_type === 'blood_pressure'" class="grid grid-cols-2 gap-4">
+            <div
+              v-if="form.metric_type === 'blood_pressure'"
+              class="grid grid-cols-2 gap-4"
+            >
               <div>
                 <label class="block text-sm font-medium text-neutral-700 mb-1">
                   Systolic
@@ -118,7 +165,7 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-neutral-700 mb-1">
-                  Diastolic  
+                  Diastolic
                 </label>
                 <input
                   v-model.number="form.diastolic"
@@ -182,16 +229,30 @@
             </div>
           </div>
 
-          <div v-if="error" class="mt-4 bg-error-50 border border-error-200 rounded-lg p-3">
+          <div
+            v-if="error"
+            class="mt-4 bg-error-50 border border-error-200 rounded-lg p-3"
+          >
             <p class="text-sm text-error-700">{{ error }}</p>
           </div>
 
           <div class="flex space-x-3 mt-6">
-            <button type="submit" :disabled="loading" class="btn-primary flex-1">
-              <div v-if="loading" class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            <button
+              type="submit"
+              :disabled="loading"
+              class="btn-primary flex-1"
+            >
+              <div
+                v-if="loading"
+                class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+              ></div>
               {{ editingMetric ? 'Update' : 'Add' }} Metric
             </button>
-            <button type="button" @click="closeModal" class="btn-outline flex-1">
+            <button
+              type="button"
+              @click="closeModal"
+              class="btn-outline flex-1"
+            >
               Cancel
             </button>
           </div>
@@ -200,14 +261,24 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <div v-if="deletingMetric" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div
+      v-if="deletingMetric"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+    >
       <div class="bg-white rounded-xl shadow-lg max-w-sm w-full p-6">
-        <h3 class="text-lg font-semibold text-neutral-900 mb-4">Delete Metric</h3>
+        <h3 class="text-lg font-semibold text-neutral-900 mb-4">
+          Delete Metric
+        </h3>
         <p class="text-neutral-600 mb-6">
-          Are you sure you want to delete this metric? This action cannot be undone.
+          Are you sure you want to delete this metric? This action cannot be
+          undone.
         </p>
         <div class="flex space-x-3">
-          <button @click="confirmDelete" :disabled="loading" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1">
+          <button
+            @click="confirmDelete"
+            :disabled="loading"
+            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex-1"
+          >
             Delete
           </button>
           <button @click="deletingMetric = null" class="btn-outline flex-1">
@@ -220,9 +291,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onMounted, watch, h, type Component } from 'vue'
-import { useHealthStore } from '@/stores/health'
-import { format } from 'date-fns'
+import {
+  ref,
+  computed,
+  reactive,
+  onMounted,
+  watch,
+  h,
+  type Component,
+} from 'vue';
+import { useHealthStore } from '@/stores/health';
+import { format } from 'date-fns';
 import {
   PlusIcon,
   ClipboardDocumentListIcon,
@@ -233,17 +312,17 @@ import {
   FireIcon,
   PencilIcon,
   TrashIcon,
-} from '@heroicons/vue/24/outline'
-import type { MetricType, HealthMetric } from '@/types'
+} from '@heroicons/vue/24/outline';
+import type { MetricType, HealthMetric } from '@/types';
 
-const healthStore = useHealthStore()
+const healthStore = useHealthStore();
 
-const showAddModal = ref(false)
-const editingMetric = ref<HealthMetric | null>(null)
-const deletingMetric = ref<HealthMetric | null>(null)
-const selectedType = ref<MetricType | null>(null)
-const loading = ref(false)
-const error = ref('')
+const showAddModal = ref(false);
+const editingMetric = ref<HealthMetric | null>(null);
+const deletingMetric = ref<HealthMetric | null>(null);
+const selectedType = ref<MetricType | null>(null);
+const loading = ref(false);
+const error = ref('');
 
 const form = reactive({
   metric_type: '' as MetricType,
@@ -253,7 +332,7 @@ const form = reactive({
   diastolic: 0,
   notes: '',
   recorded_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
-})
+});
 
 const metricTypes = [
   { value: 'blood_pressure' as MetricType, label: 'Blood Pressure' },
@@ -267,17 +346,19 @@ const metricTypes = [
   { value: 'exercise_minutes' as MetricType, label: 'Exercise Minutes' },
   { value: 'water_intake' as MetricType, label: 'Water Intake' },
   { value: 'mood_score' as MetricType, label: 'Mood Score' },
-]
+];
 
 const filteredMetrics = computed(() => {
   if (!selectedType.value) {
-    return healthStore.metrics
+    return healthStore.metrics;
   }
-  return healthStore.metrics.filter(metric => metric.metric_type === selectedType.value)
-})
+  return healthStore.metrics.filter(
+    (metric) => metric.metric_type === selectedType.value
+  );
+});
 
 // Create a fallback component to ensure we never return null
-const FallbackIcon = () => h('div', { class: 'w-5 h-5 bg-gray-300 rounded' })
+const FallbackIcon = () => h('div', { class: 'w-5 h-5 bg-gray-300 rounded' });
 
 const getMetricIcon = (type: MetricType): Component => {
   const icons: Record<MetricType, Component> = {
@@ -292,11 +373,11 @@ const getMetricIcon = (type: MetricType): Component => {
     exercise_minutes: FireIcon,
     water_intake: BeakerIcon,
     mood_score: HeartIcon,
-  }
-  
+  };
+
   // Return the specific icon or fallback to ClipboardDocumentListIcon or ultimate fallback
-  return icons[type] || ClipboardDocumentListIcon || FallbackIcon
-}
+  return icons[type] || ClipboardDocumentListIcon || FallbackIcon;
+};
 
 const formatMetricType = (type: MetricType): string => {
   const labels = {
@@ -311,20 +392,24 @@ const formatMetricType = (type: MetricType): string => {
     exercise_minutes: 'Exercise',
     water_intake: 'Water Intake',
     mood_score: 'Mood Score',
-  }
-  return labels[type] || type
-}
+  };
+  return labels[type] || type;
+};
 
 const formatMetricValue = (metric: HealthMetric): string => {
-  if (metric.metric_type === 'blood_pressure' && metric.systolic && metric.diastolic) {
-    return `${metric.systolic}/${metric.diastolic} ${metric.unit}`
+  if (
+    metric.metric_type === 'blood_pressure' &&
+    metric.systolic &&
+    metric.diastolic
+  ) {
+    return `${metric.systolic}/${metric.diastolic} ${metric.unit}`;
   }
-  return `${metric.value} ${metric.unit}`
-}
+  return `${metric.value} ${metric.unit}`;
+};
 
 const formatDate = (dateString: string): string => {
-  return format(new Date(dateString), 'MMM d, yyyy HH:mm')
-}
+  return format(new Date(dateString), 'MMM d, yyyy HH:mm');
+};
 
 const getDefaultUnit = (type: MetricType): string => {
   const units = {
@@ -339,61 +424,61 @@ const getDefaultUnit = (type: MetricType): string => {
     exercise_minutes: 'minutes',
     water_intake: 'L',
     mood_score: '/10',
-  }
-  return units[type] || ''
-}
+  };
+  return units[type] || '';
+};
 
 const resetForm = () => {
-  form.metric_type = '' as MetricType
-  form.value = 0
-  form.unit = ''
-  form.systolic = 0
-  form.diastolic = 0
-  form.notes = ''
-  form.recorded_at = format(new Date(), "yyyy-MM-dd'T'HH:mm")
-}
+  form.metric_type = '' as MetricType;
+  form.value = 0;
+  form.unit = '';
+  form.systolic = 0;
+  form.diastolic = 0;
+  form.notes = '';
+  form.recorded_at = format(new Date(), "yyyy-MM-dd'T'HH:mm");
+};
 
 const editMetric = (metric: HealthMetric) => {
-  editingMetric.value = metric
-  form.metric_type = metric.metric_type
-  form.value = metric.value || 0
-  form.unit = metric.unit
-  form.systolic = metric.systolic || 0
-  form.diastolic = metric.diastolic || 0
-  form.notes = metric.notes || ''
-  form.recorded_at = format(new Date(metric.recorded_at), "yyyy-MM-dd'T'HH:mm")
-}
+  editingMetric.value = metric;
+  form.metric_type = metric.metric_type;
+  form.value = metric.value || 0;
+  form.unit = metric.unit;
+  form.systolic = metric.systolic || 0;
+  form.diastolic = metric.diastolic || 0;
+  form.notes = metric.notes || '';
+  form.recorded_at = format(new Date(metric.recorded_at), "yyyy-MM-dd'T'HH:mm");
+};
 
 const deleteMetricConfirm = (metric: HealthMetric) => {
-  deletingMetric.value = metric
-}
+  deletingMetric.value = metric;
+};
 
 const confirmDelete = async () => {
-  if (!deletingMetric.value) return
+  if (!deletingMetric.value) return;
 
   try {
-    loading.value = true
-    await healthStore.deleteMetric(deletingMetric.value.id)
-    deletingMetric.value = null
+    loading.value = true;
+    await healthStore.deleteMetric(deletingMetric.value.id);
+    deletingMetric.value = null;
   } catch (err: any) {
-    error.value = err.message || 'Failed to delete metric'
+    error.value = err.message || 'Failed to delete metric';
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const closeModal = () => {
-  showAddModal.value = false
-  editingMetric.value = null
-  error.value = ''
-  resetForm()
-}
+  showAddModal.value = false;
+  editingMetric.value = null;
+  error.value = '';
+  resetForm();
+};
 
 const handleSubmit = async () => {
-  error.value = ''
+  error.value = '';
 
   try {
-    loading.value = true
+    loading.value = true;
 
     const metricData = {
       metric_type: form.metric_type,
@@ -403,30 +488,33 @@ const handleSubmit = async () => {
       diastolic: form.metric_type === 'blood_pressure' ? form.diastolic : null,
       notes: form.notes || null,
       recorded_at: new Date(form.recorded_at).toISOString(),
-    }
+    };
 
     if (editingMetric.value) {
-      await healthStore.updateMetric(editingMetric.value.id, metricData)
+      await healthStore.updateMetric(editingMetric.value.id, metricData);
     } else {
-      await healthStore.addMetric(metricData)
+      await healthStore.addMetric(metricData);
     }
 
-    closeModal()
+    closeModal();
   } catch (err: any) {
-    error.value = err.message || 'Failed to save metric'
+    error.value = err.message || 'Failed to save metric';
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // Auto-set unit when metric type changes
-watch(() => form.metric_type, (newType) => {
-  if (newType) {
-    form.unit = getDefaultUnit(newType)
+watch(
+  () => form.metric_type,
+  (newType) => {
+    if (newType) {
+      form.unit = getDefaultUnit(newType);
+    }
   }
-})
+);
 
 onMounted(async () => {
-  await healthStore.fetchMetrics()
-})
+  await healthStore.fetchMetrics();
+});
 </script>

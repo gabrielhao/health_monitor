@@ -10,7 +10,7 @@
       >
         <div class="flex items-center space-x-3">
           <div class="w-24 h-24 rounded-lg flex items-center justify-center">
-            <!-- 用自己的 logo 图片替换 HeartIcon -->
+
             <img
               src="@/assets/AIvital_logo.png"
               alt="Logo"
@@ -20,7 +20,7 @@
         </div>
         <button
           @click="toggleNavigation"
-          class="lg:hidden p-1 rounded-md hover:bg-neutral-100"
+          class="lg:hidden p-1 rounded-md hover:bg-white"
         >
           <XMarkIcon class="w-5 h-5" />
         </button>
