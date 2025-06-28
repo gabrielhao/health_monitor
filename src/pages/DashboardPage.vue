@@ -177,24 +177,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useHealthStore } from '@/stores/health';
 import { useChatStore } from '@/stores/chat';
-import { format } from 'date-fns';
-import {
-  HeartIcon,
-  ScaleIcon,
-  ClockIcon,
-  ChartBarIcon,
-  ClipboardDocumentListIcon,
-  ChatBubbleLeftRightIcon,
-  UserIcon,
-  CpuChipIcon,
-  BeakerIcon,
-  FireIcon,
-} from '@heroicons/vue/24/outline';
+import { useHealthStore } from '@/stores/health';
 import type { MetricType } from '@/types';
+import
+    {
+        BeakerIcon,
+        ChartBarIcon,
+        ChatBubbleLeftRightIcon,
+        ClipboardDocumentListIcon,
+        ClockIcon,
+        CpuChipIcon,
+        FireIcon,
+        HeartIcon,
+        ScaleIcon,
+        UserIcon,
+    } from '@heroicons/vue/24/outline';
+import { format } from 'date-fns';
+import { computed, onMounted, ref } from 'vue';
 
 const authStore = useAuthStore();
 const healthStore = useHealthStore();
@@ -203,7 +204,7 @@ const chatStore = useChatStore();
 // Reactive quick stats that will be populated with real data
 const quickStats = ref([
   {
-    title: 'Latest BP',
+    title: 'Latest Heart Rate',
     value: '--',
     change: 'Loading...',
     changeColor: 'text-neutral-500',
@@ -297,90 +298,115 @@ const formatDate = (dateString: string): string => {
 const updateQuickStats = async () => {
   try {
     // Get latest metrics for each type
-    const latestMetrics = healthStore.latestMetrics
-    console.log('Latest metrics by type:', latestMetrics)
+    const latestMetrics = healthStore.latestMetrics;
+    console.log('Latest metrics by type:', latestMetrics);
     
-    // Update Blood Pressure
-    if (latestMetrics['blood_pressure']) {
-      const bp = latestMetrics['blood_pressure']
-      const value = bp.systolic && bp.diastolic ? `${bp.systolic}/${bp.diastolic}` : `${bp.value} ${bp.unit}`
+    // Update Heart Rate
+    if (latestMetrics['heart_rate']) {
+      const rate = latestMetrics['heart_rate']; 
+      const value = rate.value ? `${rate.value} ${rate.unit}` : '--';
       quickStats.value[0] = {
         ...quickStats.value[0],
         value,
         change: 'Latest reading',
-        changeColor: 'text-success-600'
-      }
+        changeColor: 'text-success-600',
+      };
     } else {
       quickStats.value[0] = {
         ...quickStats.value[0],
         value: '--',
         change: 'No data',
-        changeColor: 'text-neutral-500'
-      }
+        changeColor: 'text-neutral-500',
+      };
     }
     
     // Update Weight
     if (latestMetrics.weight) {
-      const weight = latestMetrics.weight
+      const weight = latestMetrics.weight;
       quickStats.value[1] = {
         ...quickStats.value[1],
         value: `${weight.value} ${weight.unit}`,
         change: 'Latest reading',
-        changeColor: 'text-success-600'
-      }
+        changeColor: 'text-success-600',
+      };
     } else {
       quickStats.value[1] = {
         ...quickStats.value[1],
         value: '--',
         change: 'No data',
-        changeColor: 'text-neutral-500'
-      }
+        changeColor: 'text-neutral-500',
+      };
     }
     
     // Update Sleep
     if (latestMetrics.sleep_hours) {
-      const sleep = latestMetrics.sleep_hours
+      const sleep = latestMetrics.sleep_hours;
       quickStats.value[2] = {
         ...quickStats.value[2],
         value: `${sleep.value} hrs`,
         change: 'Latest reading',
-        changeColor: 'text-success-600'
-      }
+        changeColor: 'text-success-600',
+      };
     } else {
       quickStats.value[2] = {
         ...quickStats.value[2],
         value: '--',
         change: 'No data',
-        changeColor: 'text-neutral-500'
-      }
+        changeColor: 'text-neutral-500',
+      };
     }
     
     // Update Steps
     if (latestMetrics.steps) {
-      const steps = latestMetrics.steps
-      const stepValue = typeof steps.value === 'number' ? steps.value.toLocaleString() : String(steps.value || '0')
+      const steps = latestMetrics.steps;
+      const stepValue = typeof steps.value === 'number' ? steps.value.toLocaleString() : String(steps.value || '0');
       quickStats.value[3] = {
         ...quickStats.value[3],
         value: stepValue,
         change: 'Latest reading',
-        changeColor: 'text-success-600'
-      }
+        changeColor: 'text-success-600',
+      };
     } else {
       quickStats.value[3] = {
         ...quickStats.value[3],
         value: '--',
         change: 'No data',
-        changeColor: 'text-neutral-500'
-      }
+        changeColor: 'text-neutral-500',
+      };
     }
   } catch (error) {
-    console.error('Error updating quick stats:', error)
+    console.error('Error updating quick stats:', error);
   }
-}
+};
 
 onMounted(async () => {
-<<<<<<< HEAD
-  await Promise.all([healthStore.fetchMetrics(), chatStore.fetchMessages(5)]);
+  try {
+    console.log('Loading dashboard data from backend...');
+    
+    // Fetch health metrics from backend
+    await healthStore.fetchMetrics();
+    console.log(`Loaded ${healthStore.metrics.length} metrics from backend`);
+    
+    // Update quick stats with real data
+    await updateQuickStats();
+    
+    // Fetch chat messages (if available)
+    try {
+      await chatStore.fetchMessages(5);
+    } catch (error) {
+      console.warn('Could not fetch chat messages:', error);
+    }
+    
+    console.log('Dashboard data loaded successfully');
+  } catch (error) {
+    console.error('Error loading dashboard data:', error);
+    // Update quick stats to show error state
+    quickStats.value.forEach(stat => {
+      stat.value = 'Error';
+      stat.change = 'Connection failed';
+      stat.changeColor = 'text-error-600';
+    });
+  }
 });
 </script>
 
@@ -394,34 +420,3 @@ onMounted(async () => {
   backdrop-filter: blur(2px);
 }
 </style>
-=======
-  try {
-    console.log('Loading dashboard data from backend...')
-    
-    // Fetch health metrics from backend
-    await healthStore.fetchMetrics()
-    console.log(`Loaded ${healthStore.metrics.length} metrics from backend`)
-    
-    // Update quick stats with real data
-    await updateQuickStats()
-    
-    // Fetch chat messages (if available)
-    try {
-      await chatStore.fetchMessages(5)
-    } catch (error) {
-      console.warn('Could not fetch chat messages:', error)
-    }
-    
-    console.log('Dashboard data loaded successfully')
-  } catch (error) {
-    console.error('Error loading dashboard data:', error)
-    // Update quick stats to show error state
-    quickStats.value.forEach(stat => {
-      stat.value = 'Error'
-      stat.change = 'Connection failed'
-      stat.changeColor = 'text-error-600'
-    })
-  }
-})
-</script>
->>>>>>> b0aba61 (Display latest readings)
