@@ -215,21 +215,13 @@ const signIn = async () => {
     if (result && result.user) {
       router.push('/dashboard');
     } else {
-      alert('注册失败，请重试');
+      alert('Sign up failed, please try again');
     }
   } catch (error) {
     console.error('signIn error:', error);
-    alert('发生错误，请重试');
+    alert('An error occurred, please try again');
   }
 };
-
-// const vitalConcepts = [
-//   { letter: 'V', word: 'Visualization' },
-//   { letter: 'I', word: 'Insight' },
-//   { letter: 'T', word: 'Tracking' },
-//   { letter: 'A', word: 'Adaptation' },
-//   { letter: 'L', word: 'Lifestyle' },
-// ];
 </script>
 
 <style scoped>
