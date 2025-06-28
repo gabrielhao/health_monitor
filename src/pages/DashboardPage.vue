@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="mb-8">
       <h1 class="text-3xl font-bold text-neutral-900">
-        Welcome back, {{ authStore.profile?.full_name || 'User' }}
+        Welcome back, {{ getUserDisplayName() }}
       </h1>
       <p class="text-neutral-900 mt-1">Here's your health overview for today</p>
     </div>
@@ -379,9 +379,36 @@ const updateQuickStats = async () => {
   }
 };
 
+const getUserDisplayName = () => {
+  // Try to get name from profile first
+  if (authStore.profile?.full_name) {
+    return authStore.profile.full_name;
+  }
+  
+  // Fallback to user email if available
+  if (authStore.user?.email) {
+    return authStore.user.email.split('@')[0]; // Get part before @
+  }
+  
+  // Final fallback
+  return 'User';
+};
+
 onMounted(async () => {
   try {
     console.log('Loading dashboard data from backend...');
+    
+    // Initialize auth if not already done
+    if (!authStore.initialized) {
+      console.log('Initializing auth store...');
+      await authStore.initialize();
+    }
+    
+    // Fetch profile if user is authenticated but profile is missing
+    if (authStore.user && !authStore.profile) {
+      console.log('Fetching user profile...');
+      await authStore.fetchProfile();
+    }
     
     // Fetch health metrics from backend
     await healthStore.fetchMetrics();

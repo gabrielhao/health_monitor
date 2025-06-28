@@ -56,7 +56,12 @@ export const useHealthStore = defineStore('health', () => {
 
   // Fetch metrics from backend
   const fetchMetrics = async (metricType?: MetricType, limit?: number) => {
-    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+    // Get user ID from auth store with fallback
+    const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+    
+    console.log('Using user ID for health metrics:', userId)
+    console.log('Auth store user:', authStore.user)
+    console.log('Auth store profile:', authStore.profile)
 
     try {
       loading.value = true
@@ -90,7 +95,7 @@ export const useHealthStore = defineStore('health', () => {
 
   // Get metrics count from backend
   const getMetricsCount = async (): Promise<number> => {
-    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+    const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
       return await backendHealthService.getMetricsCount(userId)
@@ -102,7 +107,7 @@ export const useHealthStore = defineStore('health', () => {
 
   // Get metric types from backend
   const getMetricTypes = async (): Promise<string[]> => {
-    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+    const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
       return await backendHealthService.getMetricTypes(userId)
@@ -118,7 +123,7 @@ export const useHealthStore = defineStore('health', () => {
     aggregationType: 'avg' | 'sum' | 'min' | 'max' | 'count',
     options: { startDate?: Date; endDate?: Date } = {}
   ): Promise<{ value: number; count: number }> => {
-    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+    const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
       return await backendHealthService.getAggregatedMetrics(
@@ -155,7 +160,7 @@ export const useHealthStore = defineStore('health', () => {
     startDate: string,
     endDate: string
   ) => {
-    const userId = '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
+    const userId = /* authStore.user?.id || */ '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
 
     try {
       const backendMetrics = await backendHealthService.getHealthMetrics(userId, {
