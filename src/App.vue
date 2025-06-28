@@ -10,11 +10,13 @@
     </div>
 
     <template v-else>
-      <AppNavigation v-if="authStore.isAuthenticated" />
+      <div>
+        <AppNavigation v-if="authStore.isAuthenticated" />
 
-      <main :class="{ 'pl-64': authStore.isAuthenticated && !isMobile }">
-        <router-view />
-      </main>
+        <main :class="{ 'pl-64': authStore.isAuthenticated && !isMobile }">
+          <router-view />
+        </main>
+      </div>
     </template>
   </div>
 </template>

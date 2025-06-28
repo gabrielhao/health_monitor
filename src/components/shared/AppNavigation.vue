@@ -1,6 +1,6 @@
 <template>
   <nav
-    class="fixed top-0 left-0 h-full w-64 bg-white border-r border-neutral-200 z-50 transform transition-transform duration-300 lg:translate-x-0"
+    class="fixed top-0 left-0 h-full w-64 bg-white/40  z-50 transform transition-transform duration-300 lg:translate-x-0"
     :class="{ '-translate-x-full': !isOpen && isMobile }"
   >
     <div class="flex flex-col h-full">
@@ -149,7 +149,7 @@ const closeNavigation = () => {
 const handleSignOut = async () => {
   try {
     await authStore.signOut();
-    router.push('/auth');
+    router.push('/');
   } catch (error) {
     console.error('Error signing out:', error);
   }

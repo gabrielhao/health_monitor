@@ -81,7 +81,7 @@
             Open chat
           </router-link>
         </div>
-        
+
         <div class="space-y-4">
           <div v-if="chatStore.messages.length === 0" class="text-center py-8">
             <ChatBubbleLeftRightIcon class="w-12 h-12 text-neutral-400 mx-auto mb-3" />
@@ -90,7 +90,7 @@
               Start chatting
             </router-link>
           </div>
-          
+
           <div v-else>
             <div v-for="message in recentMessages" :key="message.id" class="flex items-start space-x-3">
               <div :class="`w-8 h-8 rounded-full flex items-center justify-center ${message.sender_type === 'ai' ? 'bg-secondary-100' : 'bg-primary-100'}`">
@@ -114,7 +114,7 @@
           View analytics
         </router-link>
       </div>
-      
+
       <div class="h-64 flex items-center justify-center bg-neutral-50 rounded-lg">
         <div class="text-center">
           <ChartBarIcon class="w-12 h-12 text-neutral-400 mx-auto mb-3" />
