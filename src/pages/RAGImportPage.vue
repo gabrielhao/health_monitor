@@ -91,13 +91,13 @@
         
         <div class="space-y-4">
           <!-- Upload Method Toggle -->
-          <div class="p-4 border border-neutral-200 rounded-lg bg-neutral-50">
+          <div class="p-4 border border-neutral-200 rounded-lg bg-neutral-50/50">
             <div class="flex items-center space-x-3 mb-3">
               <input 
                 id="uploadCompleteFile" 
                 v-model="processingOptions.uploadCompleteFile" 
                 type="checkbox" 
-                class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                class="rounded border-neutral-300 text-primary-600 focus:ring-primary-500 bg-neutral-50/50"
               />
               <label for="uploadCompleteFile" class="text-sm font-medium text-neutral-700">
                 Upload complete file without chunking
@@ -112,10 +112,10 @@
           <!-- Chunking Options (only show when not uploading complete file) -->
           <div v-if="!processingOptions.uploadCompleteFile" class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-neutral-700 mb-2">
+              <label class="block text-sm font-medium text-neutral-700 mb-2 ">
                 Chunk Size (tokens)
               </label>
-              <select v-model="processingOptions.chunkSize" class="input-field">
+              <select v-model="processingOptions.chunkSize" class="input-field bg-neutral-50/50">
                 <option :value="256">256 tokens (small chunks)</option>
                 <option :value="512">512 tokens (recommended)</option>
                 <option :value="1024">1024 tokens (large chunks)</option>
@@ -129,7 +129,7 @@
               <label class="block text-sm font-medium text-neutral-700 mb-2">
                 Chunk Overlap (tokens)
               </label>
-              <select v-model="processingOptions.chunkOverlap" class="input-field">
+              <select v-model="processingOptions.chunkOverlap" class="input-field bg-neutral-50/50">
                 <option :value="0">No overlap</option>
                 <option :value="50">50 tokens</option>
                 <option :value="100">100 tokens (recommended)</option>
@@ -482,3 +482,14 @@ onMounted(async () => {
   ])
 })
 </script>
+
+<style scoped>
+.card {
+  background: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-radius: 1rem;
+  border-style: none;
+  padding: 1.5rem;
+  backdrop-filter: blur(2px);
+}
+</style>

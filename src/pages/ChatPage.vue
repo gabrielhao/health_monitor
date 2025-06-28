@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col bg-neutral-50">
+  <div class="h-screen flex flex-col bg-neutral-50/60">
     <!-- Header -->
     <div class="bg-white border-b border-neutral-200 px-6 py-4">
       <div class="flex items-center space-x-3">
