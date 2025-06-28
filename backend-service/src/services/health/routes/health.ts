@@ -90,74 +90,6 @@ router.get('', async (req: Request, res: Response) => {
     }
 });
 
-// Create a health metric
-router.post('', async (req: Request, res: Response) => {
-    try {
-        const validation = createMetricSchema.safeParse(req.body);
-
-        if (!validation.success) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid request body',
-                details: validation.error.errors,
-            } as ApiResponse);
-        }
-
-        const data = {
-            ...validation.data,
-            timestamp: validation.data.timestamp ? new Date(validation.data.timestamp) : undefined,
-        };
-
-        const metric = await healthMetricsService.createHealthMetric(data);
-
-        res.status(201).json({
-            success: true,
-            data: metric,
-            message: 'Health metric created successfully',
-        } as ApiResponse);
-    } catch (error) {
-        console.error('Error creating health metric:', error);
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Internal server error',
-        } as ApiResponse);
-    }
-});
-
-// Create multiple health metrics
-router.post('/batch', async (req: Request, res: Response) => {
-    try {
-        const validation = createMetricsBatchSchema.safeParse(req.body);
-
-        if (!validation.success) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid request body',
-                details: validation.error.errors,
-            } as ApiResponse);
-        }
-
-        const data = validation.data.map((metric) => ({
-            ...metric,
-            timestamp: metric.timestamp ? new Date(metric.timestamp) : undefined,
-        }));
-
-        const metrics = await healthMetricsService.createHealthMetricsBatch(data);
-
-        res.status(201).json({
-            success: true,
-            data: metrics,
-            message: `Created ${metrics.length} health metrics successfully`,
-        } as ApiResponse);
-    } catch (error) {
-        console.error('Error creating health metrics batch:', error);
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Internal server error',
-        } as ApiResponse);
-    }
-});
-
 // Get metrics count
 router.get('/count', async (req: Request, res: Response) => {
     try {
@@ -257,57 +189,6 @@ router.get('/aggregate', async (req: Request, res: Response) => {
         } as ApiResponse);
     } catch (error) {
         console.error('Error getting aggregated metrics:', error);
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Internal server error',
-        } as ApiResponse);
-    }
-});
-
-// Delete health metrics
-router.delete('', async (req: Request, res: Response) => {
-    try {
-        const validation = deleteMetricsSchema.safeParse(req.body);
-
-        if (!validation.success) {
-            return res.status(400).json({
-                success: false,
-                error: 'Invalid request body',
-                details: validation.error.errors,
-            } as ApiResponse);
-        }
-
-        const { userId, metricType } = validation.data;
-
-        await healthMetricsService.deleteHealthMetrics(userId, metricType);
-
-        res.json({
-            success: true,
-            message: `Health metrics deleted successfully${metricType ? ` for type ${metricType}` : ''}`,
-        } as ApiResponse);
-    } catch (error) {
-        console.error('Error deleting health metrics:', error);
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Internal server error',
-        } as ApiResponse);
-    }
-});
-
-// Health check endpoint
-router.get('/health', async (req: Request, res: Response) => {
-    try {
-        res.json({
-            success: true,
-            data: {
-                service: 'health-metrics-service',
-                status: 'healthy',
-                timestamp: new Date().toISOString(),
-                endpoints: ['GET /', 'POST /', 'POST /batch', 'GET /count', 'GET /types', 'GET /aggregate', 'DELETE /'],
-            },
-        } as ApiResponse);
-    } catch (error) {
-        console.error('Error in health check:', error);
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Internal server error',
