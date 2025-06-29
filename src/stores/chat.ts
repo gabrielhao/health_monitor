@@ -4,6 +4,15 @@ import { azureCosmos } from '@/services/azureCosmos'
 import type { ChatMessage } from '@/types'
 import { useAuthStore } from './auth'
 import { generateAIResponse } from '@/services/chatApi'
+import { 
+  sendHealthChatMessage as apiSendHealthChatMessage, 
+  searchUserHealthData,
+  generateHealthInsights,
+  type HealthChatMessage, 
+  type HealthDataSearchOptions,
+  type HealthChatResponse,
+  type HealthDataSearchResult 
+} from '@/services/healthChatApi'
 
 export const useChatStore = defineStore('chat', () => {
   const authStore = useAuthStore()
@@ -11,6 +20,14 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([])
   const loading = ref(false)
   const typing = ref(false)
+  
+  // Health context and RAG state
+  const healthContextEnabled = ref(true)
+  const lastRagContext = ref<HealthChatResponse['ragContext'] | null>(null)
+  const healthSearchOptions = ref<HealthDataSearchOptions>({
+    limit: 10,
+    similarityThreshold: 0.75
+  })
 
   // Fetch messages
   const fetchMessages = async (limit = 50) => {
@@ -66,6 +83,115 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // Send health-aware message with RAG context
+  const sendHealthMessage = async (
+    message: string, 
+    messageType: 'text' | 'image' | 'file' = 'text',
+    enableHealth = healthContextEnabled.value
+  ) => {
+    if (!authStore.user) throw new Error('Not authenticated')
+
+    try {
+      // Add user message to local storage
+      const userMessage = await azureCosmos.createChatMessage({
+        user_id: authStore.user.id,
+        message,
+        sender_type: 'user',
+        message_type: messageType,
+      })
+
+      messages.value.push(userMessage)
+
+      // Generate health-aware AI response
+      typing.value = true
+      
+      const healthChatMessages: HealthChatMessage[] = [
+        { role: 'user', content: message }
+      ]
+
+      const healthResponse = await apiSendHealthChatMessage(healthChatMessages, {
+        userId: authStore.user.id,
+        enableHealthContext: enableHealth,
+        healthSearchOptions: healthSearchOptions.value
+      })
+
+      // Store RAG context for debugging/display
+      lastRagContext.value = healthResponse.ragContext || null
+
+      // Store AI response
+      const aiMessage = await azureCosmos.createChatMessage({
+        user_id: authStore.user.id,
+        message: healthResponse.message,
+        sender_type: 'ai',
+        message_type: 'text',
+        metadata: {
+          ragContext: healthResponse.ragContext,
+          model: healthResponse.model,
+          usage: healthResponse.usage
+        }
+      })
+
+      messages.value.push(aiMessage)
+      
+      return { userMessage, aiMessage, ragContext: healthResponse.ragContext }
+    } catch (error) {
+      console.error('Error sending health message:', error)
+      throw error
+    } finally {
+      typing.value = false
+    }
+  }
+
+  // Search health data with AI analysis
+  const searchHealthData = async (query: string, options?: HealthDataSearchOptions): Promise<HealthDataSearchResult> => {
+    if (!authStore.user) throw new Error('Not authenticated')
+
+    try {
+      loading.value = true
+      
+      const searchOptions = { ...healthSearchOptions.value, ...options }
+      const result = await searchUserHealthData(authStore.user.id, query, searchOptions)
+      
+      return result
+    } catch (error) {
+      console.error('Error searching health data:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Generate health insights for common categories
+  const getHealthInsights = async (
+    insightType: 'sleep' | 'activity' | 'heart_rate' | 'general',
+    timeRange?: { start: string; end: string }
+  ): Promise<HealthDataSearchResult> => {
+    if (!authStore.user) throw new Error('Not authenticated')
+
+    try {
+      loading.value = true
+      
+      const result = await generateHealthInsights(authStore.user.id, insightType, timeRange)
+      
+      return result
+    } catch (error) {
+      console.error('Error generating health insights:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Toggle health context for chat
+  const toggleHealthContext = (enabled: boolean) => {
+    healthContextEnabled.value = enabled
+  }
+
+  // Update health search options
+  const updateHealthSearchOptions = (options: Partial<HealthDataSearchOptions>) => {
+    healthSearchOptions.value = { ...healthSearchOptions.value, ...options }
+  }
+
 
 
   // Delete message
@@ -95,12 +221,27 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
+    // Existing state
     messages: readonly(messages),
     loading: readonly(loading),
     typing: readonly(typing),
+    
+    // Health context state
+    healthContextEnabled: readonly(healthContextEnabled),
+    lastRagContext: readonly(lastRagContext),
+    healthSearchOptions: readonly(healthSearchOptions),
+    
+    // Existing methods
     fetchMessages,
     sendMessage,
     deleteMessage,
     clearMessages,
+    
+    // New health-aware methods
+    sendHealthMessage,
+    searchHealthData,
+    getHealthInsights,
+    toggleHealthContext,
+    updateHealthSearchOptions,
   }
 })
