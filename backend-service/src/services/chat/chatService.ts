@@ -1,5 +1,6 @@
 import { AzureOpenAI } from "openai";
 import type { ChatCompletionCreateParams } from "openai/resources/chat/completions";
+import { healthRagService, type HealthDataSearchOptions, type RagResponse } from './healthRagService.js';
 
 export interface ChatServiceConfig {
   endpoint: string;
@@ -33,6 +34,16 @@ export interface ChatResponse {
     totalTokens: number;
   };
   model: string;
+  ragContext?: {
+    dataSourcesUsed: number;
+    averageSimilarity: number;
+    contextSummary: string;
+  };
+}
+
+export interface HealthChatRequest extends ChatRequest {
+  enableHealthContext?: boolean;
+  healthSearchOptions?: HealthDataSearchOptions;
 }
 
 class ChatService {
@@ -42,29 +53,28 @@ class ChatService {
 
   async initialize(): Promise<void> {
     try {
-      // Load configuration from environment variables
+      const apiKey = process.env.AZURE_OPENAI_CHAT_API_KEY || "";
+      const apiVersion = "2024-04-01-preview";
+      const endpoint = process.env.AZURE_OPENAI_CHAT_ENDPOINT || "https://health-monitor-openai.openai.azure.com/";
+      const modelName = process.env.AZURE_OPENAI_CHAT_MODEL || "gpt-4.1";
+      const deployment = process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4.1";
+      const options = { endpoint, apiKey, deployment, apiVersion }
+
+      this.client = new AzureOpenAI(options);
+
+      // Set the config so the service is considered initialized
       this.config = {
-        endpoint: process.env.AZURE_OPENAI_CHAT_ENDPOINT || "https://health-monitor-openai.openai.azure.com/",
-        apiKey: process.env.AZURE_OPENAI_CHAT_API_KEY || "",
-        deployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "o4-mini",
-        apiVersion: process.env.AZURE_OPENAI_CHAT_API_VERSION || "2024-12-01-preview",
-        modelName: process.env.AZURE_OPENAI_CHAT_MODEL || "o4-mini"
+        endpoint,
+        apiKey,
+        deployment,
+        apiVersion,
+        modelName
       };
 
-      if (!this.config.apiKey) {
-        throw new Error('Azure OpenAI API key is required for chat service');
-      }
+      console.log(`Chat service configured with endpoint: ${endpoint}`);
+      console.log(`Using deployment: ${deployment}`);
+      console.log('Chat service initialization completed successfully');
 
-      // Initialize Azure OpenAI client
-      this.client = new AzureOpenAI({
-        endpoint: this.config.endpoint,
-        apiKey: this.config.apiKey,
-        deployment: this.config.deployment,
-        apiVersion: this.config.apiVersion
-      });
-
-      console.log(`Chat service configured with endpoint: ${this.config.endpoint}`);
-      console.log(`Using deployment: ${this.config.deployment}`);
       
     } catch (error) {
       console.error('Failed to initialize chat service:', error);
@@ -98,7 +108,7 @@ class ChatService {
       const completionParams: ChatCompletionCreateParams = {
         messages: messages.map(msg => ({ role: msg.role, content: msg.content })),
         model: this.config.modelName,
-        max_completion_tokens: request.maxTokens || 100000,
+        max_completion_tokens: request.maxTokens || 4000,
         temperature: request.temperature || 1
       };
 
@@ -171,7 +181,7 @@ class ChatService {
       const completionParams: ChatCompletionCreateParams = {
         messages: messages.map(msg => ({ role: msg.role, content: msg.content })),
         model: this.config.modelName,
-        max_completion_tokens: request.maxTokens || 100000,
+        max_completion_tokens: request.maxTokens || 4000,
         temperature: request.temperature || 1,
         stream: true
       };
@@ -256,6 +266,169 @@ class ChatService {
     } catch (error) {
       console.error('Chat service health check failed:', error);
       throw new Error(`Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create health-aware chat completion with RAG integration
+   */
+  async createHealthChatCompletion(request: HealthChatRequest): Promise<ChatResponse> {
+    if (!this.client || !this.config) {
+      throw new Error('Chat service not initialized');
+    }
+
+    try {
+      let enhancedRequest = { ...request };
+      let ragContext: ChatResponse['ragContext'] | undefined;
+
+      // If health context is enabled and userId is provided, enhance with RAG
+      if (request.enableHealthContext && request.userId && request.messages.length > 0) {
+        const userMessage = request.messages[request.messages.length - 1];
+        
+        if (userMessage.role === 'user') {
+          try {
+            console.log(`Generating health context for user ${request.userId}`);
+            
+            const ragResponse = await healthRagService.createRagEnhancedPrompt(
+              request.userId,
+              userMessage.content,
+              request.healthSearchOptions
+            );
+
+            // Add RAG context as system prompt
+            enhancedRequest.systemPrompt = ragResponse.enhancedPrompt;
+
+            // Calculate RAG context stats
+            if (ragResponse.context.relevantData.length > 0) {
+              const avgSimilarity = ragResponse.context.relevantData.reduce(
+                (sum, chunk) => sum + chunk.similarity, 0
+              ) / ragResponse.context.relevantData.length;
+
+              ragContext = {
+                dataSourcesUsed: ragResponse.context.totalMatches,
+                averageSimilarity: avgSimilarity,
+                contextSummary: ragResponse.context.contextSummary
+              };
+
+              console.log(`Health RAG context: ${ragResponse.context.totalMatches} relevant data sources found`);
+            }
+          } catch (ragError) {
+            console.warn('Failed to generate health context, proceeding without RAG:', ragError);
+          }
+        }
+      }
+
+      // Create the chat completion with enhanced context
+      const response = await this.createChatCompletion(enhancedRequest);
+
+      // Add RAG context to response
+      if (ragContext) {
+        response.ragContext = ragContext;
+      }
+
+      return response;
+
+    } catch (error) {
+      console.error('Error creating health chat completion:', error);
+      throw new Error(`Health chat completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Create streaming health-aware chat completion with RAG integration
+   */
+  async createStreamingHealthChatCompletion(request: HealthChatRequest): Promise<AsyncIterable<string>> {
+    if (!this.client || !this.config) {
+      throw new Error('Chat service not initialized');
+    }
+
+    try {
+      let enhancedRequest = { ...request };
+
+      // If health context is enabled and userId is provided, enhance with RAG
+      if (request.enableHealthContext && request.userId && request.messages.length > 0) {
+        const userMessage = request.messages[request.messages.length - 1];
+        
+        if (userMessage.role === 'user') {
+          try {
+            console.log(`Generating health context for streaming chat for user ${request.userId}`);
+            
+            const ragResponse = await healthRagService.createRagEnhancedPrompt(
+              request.userId,
+              userMessage.content,
+              request.healthSearchOptions
+            );
+
+            // Add RAG context as system prompt
+            enhancedRequest.systemPrompt = ragResponse.enhancedPrompt;
+
+            console.log(`Health RAG context applied for streaming: ${ragResponse.context.totalMatches} relevant data sources`);
+          } catch (ragError) {
+            console.warn('Failed to generate health context for streaming, proceeding without RAG:', ragError);
+          }
+        }
+      }
+
+      // Create the streaming chat completion with enhanced context
+      return await this.createStreamingChatCompletion(enhancedRequest);
+
+    } catch (error) {
+      console.error('Error creating streaming health chat completion:', error);
+      throw new Error(`Streaming health chat completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Search and analyze user's health data for a specific query
+   */
+  async searchUserHealthData(
+    userId: string,
+    query: string,
+    options: HealthDataSearchOptions = {}
+  ): Promise<{
+    query: string;
+    relevantData: any[];
+    insights: string;
+    dataSourcesFound: number;
+  }> {
+    try {
+      console.log(`Searching health data for user ${userId}: "${query}"`);
+      
+      const context = await healthRagService.generateHealthContext(userId, query, options);
+
+      // Generate insights based on the health data
+      const insightsPrompt = `Based on the following health data context, provide a brief analysis and insights:
+
+${context.contextSummary}
+
+Relevant data details:
+${context.relevantData.map((chunk, index) => 
+  `${index + 1}. ${chunk.content}`
+).join('\n')}
+
+Please provide:
+1. Key patterns or trends you observe
+2. Notable insights about the user's health
+3. Any recommendations or areas of focus
+4. Overall assessment
+
+Keep the response concise and actionable.`;
+
+      const insightsResponse = await this.createChatCompletion({
+        messages: [{ role: 'user', content: insightsPrompt }],
+        systemPrompt: 'You are a health data analyst. Provide clear, factual insights based on the provided health data.'
+      });
+
+      return {
+        query,
+        relevantData: context.relevantData,
+        insights: insightsResponse.message,
+        dataSourcesFound: context.totalMatches
+      };
+
+    } catch (error) {
+      console.error('Error searching user health data:', error);
+      throw new Error(`Health data search failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

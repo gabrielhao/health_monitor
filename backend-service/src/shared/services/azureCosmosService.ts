@@ -448,7 +448,9 @@ export class AzureCosmosService {
       parameters.push({ name: '@documentId', value: options.documentId })
     }
 
-    query += ' ORDER BY c.document_id, c.chunk_index'
+    // Note: ORDER BY requires composite index in Cosmos DB
+    // For now, we'll skip ordering to avoid index issues
+    // query += ' ORDER BY c.document_id, c.chunk_index'
 
     if (options.limit) {
       query += ` OFFSET 0 LIMIT ${options.limit}`
