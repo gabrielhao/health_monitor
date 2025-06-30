@@ -54,12 +54,12 @@ export interface StreamChunk {
 class ChatApiClient {
   private readonly baseUrl: string;
   private readonly timeout: number;
-  private readonly maxRetries: number;
+  // private readonly maxRetries: number; // Removed unused property
 
   constructor() {
     this.baseUrl = chatApiConfig.baseUrl;
     this.timeout = chatApiConfig.timeout;
-    this.maxRetries = chatApiConfig.maxRetries;
+    // this.maxRetries = chatApiConfig.maxRetries; // Removed unused property
   }
 
   private async makeRequest<T>(

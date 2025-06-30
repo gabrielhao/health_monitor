@@ -414,7 +414,7 @@ class AzureCosmosService {
         return resources as RAGImportSession[];
     }
 
-    async searchSimilarRagChunks(queryEmbedding: number[], userId: string, options?: { threshold?: number; limit?: number }): Promise<RAGChunk[]> {
+    async searchSimilarRagChunks(_queryEmbedding: number[], userId: string, options?: { threshold?: number; limit?: number }): Promise<RAGChunk[]> {
         const container = this.ensureContainer(azureConfig.cosmosDb.containers.ragChunks);
 
         // Simple implementation - in production, you'd want vector similarity search

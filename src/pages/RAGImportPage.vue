@@ -347,7 +347,7 @@ import {
   DocumentIcon,
   CheckCircleIcon,
   ClockIcon,
-  XCircleIcon,
+  // XCircleIcon, // Removed unused icon
   TrashIcon,
 } from '@heroicons/vue/24/outline'
 import type { RAGProcessingOptions } from '@/types/rag'

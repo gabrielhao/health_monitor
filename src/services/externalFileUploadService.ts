@@ -86,9 +86,6 @@ class ExternalFileUploadService {
     console.log(`[ExternalUpload] Starting upload for file: ${file.name}`)
     
     const {
-      contentType = file.type,
-      metadata = {},
-      onProgress,
       maxRetries = this.maxRetries,
       timeout = this.defaultTimeout
     } = options
@@ -129,11 +126,9 @@ class ExternalFileUploadService {
     }))
 
     // Track progress for direct upload
-    let uploadedBytes = 0
     const totalBytes = file.size
 
     const updateProgress = (loaded: number) => {
-      uploadedBytes = loaded
       const percentage = (loaded / totalBytes) * 100
       
       options.onProgress?.({
@@ -151,7 +146,7 @@ class ExternalFileUploadService {
       const response = await this.makeRequestWithProgress('', {
         method: 'POST',
         body: formData,
-        timeout: options.timeout || this.defaultTimeout
+        signal: AbortSignal.timeout(this.defaultTimeout)
       }, updateProgress)
 
       const result: ApiResponse = await response.json()
@@ -241,7 +236,7 @@ class ExternalFileUploadService {
 
     // Add timeout
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), options.timeout || this.defaultTimeout)
+    const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout)
     requestOptions.signal = controller.signal
 
     try {
@@ -312,7 +307,8 @@ class ExternalFileUploadService {
 
       // Configure request
       xhr.open(options.method || 'GET', url)
-      xhr.timeout = options.timeout || this.defaultTimeout
+      const timeoutOption = options as unknown as { timeout?: number }
+      xhr.timeout = timeoutOption.timeout || this.defaultTimeout
 
       // Add headers
       if (this.apiKey) {

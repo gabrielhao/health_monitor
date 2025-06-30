@@ -252,7 +252,7 @@ export const useAuthStore = defineStore('auth', () => {
     };
 
     // Reset password (handled by Azure AD)
-    const resetPassword = async (email: string) => {
+    const resetPassword = async (_email: string) => {
         throw new Error('Password reset is handled through Azure Active Directory. Please use the Azure AD password reset flow.');
     };
 

@@ -89,12 +89,12 @@ interface ApiResponse<T = any> {
 class HealthChatApiClient {
   private readonly baseUrl: string;
   private readonly timeout: number;
-  private readonly maxRetries: number;
+  // private readonly maxRetries: number; // Removed unused property
 
   constructor() {
     this.baseUrl = healthChatApiConfig.baseUrl;
     this.timeout = healthChatApiConfig.timeout;
-    this.maxRetries = healthChatApiConfig.maxRetries;
+    // this.maxRetries = healthChatApiConfig.maxRetries; // Removed unused property
   }
 
   private async makeRequest<T>(

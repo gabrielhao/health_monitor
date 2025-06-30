@@ -49,7 +49,7 @@ export class StreamingXMLParser {
     }
   }
 
-  private extractRecords(final = false): any[] {
+  private extractRecords(_final = false): any[] {
     const records: any[] = []
     
     // Look for complete Record elements
@@ -122,7 +122,6 @@ export class StreamingXMLParser {
 export class StreamingJSONParser {
   private buffer = ''
   private depth = 0
-  private inArray = false
   private recordCount = 0
   
   constructor(private options: StreamingParserOptions = {}) {}

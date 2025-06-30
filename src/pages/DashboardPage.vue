@@ -246,7 +246,7 @@ const recentMetrics = computed(() => healthStore.metrics.slice(0, 5));
 const recentMessages = computed(() => chatStore.messages.slice(-3));
 
 const getMetricIcon = (type: MetricType) => {
-  const icons = {
+  const icons: Partial<Record<MetricType, any>> = {
     blood_pressure: HeartIcon,
     heart_rate: HeartIcon,
     weight: ScaleIcon,
@@ -258,12 +258,13 @@ const getMetricIcon = (type: MetricType) => {
     exercise_minutes: FireIcon,
     water_intake: BeakerIcon,
     mood_score: HeartIcon,
+    physical_effort: FireIcon,
   };
   return icons[type] || ClipboardDocumentListIcon;
 };
 
 const formatMetricType = (type: MetricType): string => {
-  const labels = {
+  const labels: Partial<Record<MetricType, string>> = {
     blood_pressure: 'Blood Pressure',
     heart_rate: 'Heart Rate',
     weight: 'Weight',
@@ -275,6 +276,7 @@ const formatMetricType = (type: MetricType): string => {
     exercise_minutes: 'Exercise',
     water_intake: 'Water Intake',
     mood_score: 'Mood Score',
+    physical_effort: 'Physical Effort',
   };
   return labels[type] || type;
 };

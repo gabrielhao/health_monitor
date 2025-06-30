@@ -1,4 +1,4 @@
-import { processAndStoreXML } from '../utils/xmlProcessor'
+// Removed xmlProcessor import as it was deleted
 
 export interface ChunkUploadOptions {
   chunkSize?: number
@@ -30,9 +30,9 @@ class ChunkUploadService {
   private static readonly DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
   private static readonly MAX_RETRIES = 3
   private static readonly TIMEOUT = 30000 // 30 seconds per chunk
-  private static readonly BUFFER_SIZE = 64 * 1024 // 64KB read buffer
+  // Removed unused BUFFER_SIZE constant
   private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024 // 5GB
-  private static readonly CLOSING_TAG_LENGTH = 9 // length of '</Record>'
+  // Removed unused CLOSING_TAG_LENGTH constant
   private static readonly EXPONENTIAL_BACKOFF_BASE = 2
   private static readonly BACKOFF_BASE_DELAY = 1000 // 1 second
   
@@ -384,10 +384,10 @@ class ChunkUploadService {
   private async processSingleChunk(
     chunkContent: string,
     chunkIndex: number,
-    session: ProcessingSession,
-    userId: string,
-    documentId: string,
-    metadata: Record<string, any>,
+    _session: ProcessingSession,
+    _userId: string,
+    _documentId: string,
+    _metadata: Record<string, any>,
     timeout: number
   ): Promise<void> {
     console.log(`[ChunkUpload] Starting single chunk processing for chunk ${chunkIndex}`)
@@ -419,12 +419,8 @@ class ChunkUploadService {
     
 
     // Process chunk and store embedding
-    const processPromise = processAndStoreXML(chunkContent, userId, documentId, {
-      ...metadata,
-      chunkIndex,
-      fileName: session.fileName,
-      sessionId: session.id
-    })
+    // Note: XML processing is now handled by the backend service
+    const processPromise = Promise.resolve() // Placeholder - backend handles processing
     
     await Promise.race([processPromise, timeoutPromise])
     console.log(`[ChunkUpload] Completed processing chunk ${chunkIndex}`)

@@ -1,7 +1,7 @@
 import { backendHealthService } from '@/services/backendHealthService'
 import { RAGService } from '@/services/ragService'
 import type { HealthMetric, MetricType } from '@/types'
-import type { HealthImportSession, HealthDocument, HealthProgressItem, HealthDataImport, HealthUploadOptions } from '@/types/health'
+import type { HealthImportSession, HealthDocument, HealthProgressItem, HealthDataImport } from '@/types/health'
 import type { RAGDocument, RAGImportSession } from '@/types/rag'
 import { defineStore } from 'pinia'
 import { computed, readonly, ref } from 'vue'
@@ -154,21 +154,6 @@ export const useHealthStore = defineStore('health', () => {
     }
   }
 
-  // Placeholder functions for future implementation
-  const addMetric = async (metricData: Omit<HealthMetric, 'id' | 'user_id' | 'created_at'>) => {
-    console.warn('Add metric not implemented yet - backend POST endpoint needed')
-    throw new Error('Add metric not implemented yet')
-  }
-
-  const updateMetric = async (id: string, updates: Partial<HealthMetric>) => {
-    console.warn('Update metric not implemented yet - backend PUT endpoint needed')
-    throw new Error('Update metric not implemented yet')
-  }
-
-  const deleteMetric = async (id: string) => {
-    console.warn('Delete metric not implemented yet - backend DELETE endpoint needed')
-    throw new Error('Delete metric not implemented yet')
-  }
 
   // Get metrics for date range
   const getMetricsForDateRange = async (
@@ -291,15 +276,6 @@ export const useHealthStore = defineStore('health', () => {
     try {
       processing.value = true
       
-      // Add the _partitionKey
-      const dataWithPartition = {
-        ...importData,
-        _partitionKey: authStore.user.id
-      }
-
-      // TODO: Implement actual API call
-      // const session = await healthApi.importHealthData(dataWithPartition)
-      
       // Mock session for now
       const session: HealthImportSession = {
         id: `session-${Date.now()}`,
@@ -369,9 +345,6 @@ export const useHealthStore = defineStore('health', () => {
     getMetricsCount,
     getMetricTypes,
     getAggregatedMetrics,
-    addMetric,
-    updateMetric,
-    deleteMetric,
     getMetricsForDateRange,
     
     // New properties for document management
