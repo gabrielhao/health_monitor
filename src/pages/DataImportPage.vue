@@ -51,7 +51,7 @@
       <!-- File Upload -->
       <div class="card">
         <h2 class="text-xl font-semibold text-neutral-900 mb-6">
-          Upload Health Data
+          Upload Health Documents
         </h2>
 
         <div class="space-y-4">
@@ -72,82 +72,20 @@
             </select>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-neutral-700 mb-2">
-              Upload File
-            </label>
-            <div
-              @drop="handleDrop"
-              @dragover.prevent
-              @dragenter.prevent
-              class="border-2 border-dashed border-neutral-300 rounded-lg p-6 text-center hover:border-primary-400 transition-colors duration-200"
-            >
-              <input
-                ref="fileInput"
-                type="file"
-                @change="handleFileSelect"
-                accept=".xml,.json,.csv,.zip"
-                class="hidden"
-              />
-              <CloudArrowUpIcon
-                class="w-12 h-12 text-neutral-400 mx-auto mb-3"
-              />
-              <p class="text-neutral-600 mb-2">
-                <button
-                  @click="handleFileInputClick"
-                  class="text-primary-600 hover:text-primary-500"
-                >
-                  Click to upload
-                </button>
-                or drag and drop
-              </p>
-              <p class="text-sm text-neutral-500">
-                Supports XML, JSON, CSV, ZIP files up to 5GB
-              </p>
-              <p class="text-xs text-primary-600 mt-2">
-                ✓ Large files automatically use chunked upload with resume
-                capability
-              </p>
-            </div>
+          <!-- File Upload Drop Zone -->
+          <FileUploadDropZone
+            :accepted-types="'.xml,.json,.csv,.zip'"
+            accepted-types-text="Supports XML, JSON, CSV, ZIP files up to 5GB"
+            :max-file-size="5 * 1024 * 1024 * 1024"
+            :max-files="1"
+            :allow-multiple="false"
+            help-text="✓ Large files automatically use chunked upload with resume capability"
+            @files-selected="handleFilesSelected"
+            @validation-error="handleValidationError"
+            ref="fileUploadRef"
+          />
 
-            <div
-              v-if="uploadForm.file"
-              class="mt-3 p-3 bg-primary-50 rounded-lg"
-            >
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                  <DocumentIcon class="w-5 h-5 text-primary-600" />
-                  <span class="text-sm font-medium text-primary-900">{{
-                    uploadForm.file.name
-                  }}</span>
-                  <span class="text-xs text-primary-600"
-                    >({{ formatFileSize(uploadForm.file.size) }})</span
-                  >
-                </div>
-                <button
-                  @click="clearFile"
-                  class="text-primary-600 hover:text-primary-800"
-                >
-                  <XMarkIcon class="w-4 h-4" />
-                </button>
-              </div>
-
-              <!-- Large file info -->
-              <div
-                v-if="uploadForm.file.size > 100 * 1024 * 1024"
-                class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded"
-              >
-                <p class="text-xs text-blue-700">
-                  <strong>Large File Detected:</strong> This
-                  {{ formatFileSize(uploadForm.file.size) }} file will be
-                  uploaded using chunked upload for reliability and resume
-                  capability.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="uploadForm.file">
+          <div v-if="selectedFiles.length > 0">
             <label class="block text-sm font-medium text-neutral-700 mb-2">
               Import Notes (Optional)
             </label>
@@ -161,7 +99,7 @@
 
           <!-- Advanced Options for Large Files -->
           <div
-            v-if="uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024"
+            v-if="selectedFiles.length > 0 && selectedFiles[0].size > 100 * 1024 * 1024"
             class="space-y-3"
           >
             <div class="border border-blue-200 rounded-lg p-4 bg-blue-50">
@@ -216,17 +154,7 @@
           >
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg
-                  class="h-5 w-5 text-error-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
+                <ExclamationCircleIcon class="h-5 w-5 text-error-400" />
               </div>
               <div class="ml-3">
                 <h3 class="text-sm font-medium text-error-800">
@@ -251,13 +179,13 @@
             @click="handleUpload"
             :disabled="
               !uploadForm.source ||
-              !uploadForm.file ||
-              fileUpload.uploading.value
+              selectedFiles.length === 0 ||
+              healthStore.processing
             "
             class="btn-primary w-full"
           >
             <div
-              v-if="fileUpload.uploading.value"
+              v-if="healthStore.processing"
               class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
             ></div>
             {{ getUploadButtonText() }}
@@ -321,24 +249,13 @@
     </div>
 
     <!-- Upload Progress -->
-    <div
-      v-if="
-        fileUpload.uploading.value ||
-        (fileUpload.progress.value.percentage > 0 &&
-          fileUpload.progress.value.percentage < 100)
-      "
+    <UploadProgressList
+      v-if="healthStore.uploadProgress.length > 0"
+      :progress-items="progressItems"
+      title="Processing Progress"
+      @clear-progress="healthStore.clearProgress"
       class="mb-8"
-    >
-      <FileUploadProgress
-        :file-name="uploadForm.file?.name || ''"
-        :progress="fileUpload.progress.value"
-        :uploading="fileUpload.uploading.value"
-        :error="fileUpload.error.value"
-        :formatted-speed="fileUpload.formattedSpeed.value"
-        :formatted-e-t-a="fileUpload.formattedETA.value"
-        @cancel="fileUpload.cancelUpload"
-      />
-    </div>
+    />
 
     <!-- Processing Progress -->
     <div v-if="currentImport" class="card mb-8">
@@ -378,19 +295,36 @@
       </div>
     </div>
 
+    <!-- Document Library -->
+    <DocumentLibrary
+      :documents="[...healthStore.documents]"
+      :loading="healthStore.loading"
+      title="Health Documents"
+      empty-title="No health documents yet"
+      empty-message="Upload your first health data to get started."
+      :get-title="getDocumentTitle"
+      :get-size="getDocumentSize"
+      :get-date="getDocumentDate"
+      :get-status="getDocumentStatus"
+      :get-file-icon="getDocumentIcon"
+      @refresh="healthStore.fetchDocuments"
+      @delete="healthStore.deleteDocument"
+      class="mb-8"
+    />
+
     <!-- Import History -->
     <div class="card">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-neutral-900">Import History</h2>
         <button
-          @click="vectorStore.fetchImportSessions()"
+          @click="healthStore.fetchImportSessions()"
           class="text-sm text-primary-600 hover:text-primary-500"
         >
           Refresh
         </button>
       </div>
 
-      <div v-if="vectorStore.loading" class="animate-pulse">
+      <div v-if="healthStore.loading" class="animate-pulse">
         <div v-for="i in 3" :key="i" class="flex items-center space-x-4 mb-4">
           <div class="w-10 h-10 bg-neutral-200 rounded-lg"></div>
           <div class="flex-1">
@@ -401,7 +335,7 @@
       </div>
 
       <div
-        v-else-if="vectorStore.importSessions.length === 0"
+        v-else-if="healthStore.importSessions.length === 0"
         class="text-center py-8"
       >
         <CloudArrowUpIcon class="w-12 h-12 text-neutral-400 mx-auto mb-3" />
@@ -413,7 +347,7 @@
 
       <div v-else class="space-y-4">
         <div
-          v-for="session in vectorStore.importSessions"
+          v-for="session in healthStore.importSessions"
           :key="session.id"
           class="flex items-center justify-between p-4 bg-neutral-50/50 rounded-lg"
         >
@@ -448,20 +382,13 @@
             </span>
             <button
               v-if="session.error_log.length > 0"
-              @click="
-                showErrors({ ...session, error_log: [...session.error_log] })
-              "
+              @click="showErrors(session)"
               class="text-sm text-error-600 hover:text-error-500"
             >
               View Errors
             </button>
             <button
-              @click="
-                viewImportDetails({
-                  ...session,
-                  error_log: [...session.error_log],
-                })
-              "
+              @click="viewImportDetails(session)"
               class="text-sm text-primary-600 hover:text-primary-500"
             >
               Details
@@ -487,7 +414,7 @@
         <div class="flex space-x-3">
           <button
             @click="importSampleData"
-            :disabled="vectorStore.importing"
+            :disabled="healthStore.processing"
             class="btn-primary flex-1"
           >
             Import Sample Data
@@ -642,16 +569,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue';
-import { useVectorStore } from '@/stores/vector';
+import { ref, reactive, onMounted, computed } from 'vue';
+import { useHealthStore } from '@/stores/health';
 import { useRouter } from 'vue-router';
 import { useFileUpload } from '@/composables/useFileUpload';
+import { useFileValidation } from '@/composables/useFileValidation';
 import { format } from 'date-fns';
-import FileUploadProgress from '@/components/shared/FileUploadProgress.vue';
+import FileUploadDropZone from '@/components/shared/FileUploadDropZone.vue';
+import UploadProgressList from '@/components/shared/UploadProgressList.vue';
+import DocumentLibrary from '@/components/shared/DocumentLibrary.vue';
+import type { HealthImportSession, HealthDocument } from '@/types/health';
+import type { UploadProgressItem } from '@/composables/useUploadProgress';
 import {
   CloudArrowUpIcon,
-  DocumentIcon,
-  XMarkIcon,
   DevicePhoneMobileIcon,
   CloudIcon,
   BeakerIcon,
@@ -660,23 +590,23 @@ import {
   ClockIcon,
   XCircleIcon,
 } from '@heroicons/vue/24/outline';
-import type { ImportSession } from '@/types/vector';
 
-const vectorStore = useVectorStore();
+const healthStore = useHealthStore();
 const router = useRouter();
 const fileUpload = useFileUpload();
+const { getFileIcon } = useFileValidation();
 
 const showSampleData = ref(false);
-const selectedSession = ref<ImportSession | null>(null);
-const detailsSession = ref<ImportSession | null>(null);
-const currentImport = ref<ImportSession | null>(null);
-const fileInput = ref<HTMLInputElement>();
+const selectedSession = ref<HealthImportSession | null>(null);
+const detailsSession = ref<HealthImportSession | null>(null);
+const currentImport = ref<HealthImportSession | null>(null);
+const fileUploadRef = ref();
 const uploadError = ref('');
 const uploadErrorDetails = ref('');
+const selectedFiles = ref<File[]>([]);
 
 const uploadForm = reactive({
   source: '',
-  file: null as File | null,
   notes: '',
   chunkSize: 5 * 1024 * 1024, // Default 5MB chunks
 });
@@ -724,181 +654,102 @@ const supportedSources = [
   },
 ];
 
-const handleFileSelect = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  if (target.files && target.files[0]) {
-    uploadForm.file = target.files[0];
-    uploadError.value = '';
-    uploadErrorDetails.value = '';
-    validateFile(target.files[0]);
-  }
-};
+// Transform health store progress to match component interface
+const progressItems = computed((): UploadProgressItem[] => {
+  return healthStore.uploadProgress.map(item => ({
+    filename: item.filename,
+    size: item.size,
+    status: item.status,
+    progress: item.progress,
+    error: item.error,
+    speed: item.speed,
+    eta: item.eta
+  }));
+});
 
-const handleDrop = (event: DragEvent) => {
-  event.preventDefault();
-  const files = event.dataTransfer?.files;
-  if (files && files[0]) {
-    uploadForm.file = files[0];
-    uploadError.value = '';
-    uploadErrorDetails.value = '';
-    validateFile(files[0]);
-  }
-};
-
-const clearFile = () => {
-  uploadForm.file = null;
+const handleFilesSelected = (files: File[]) => {
+  selectedFiles.value = files;
   uploadError.value = '';
   uploadErrorDetails.value = '';
-  fileUpload.resetProgress();
-  if (fileInput.value) {
-    fileInput.value.value = '';
-  }
 };
 
-const validateFile = (file: File) => {
-  const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
-  const allowedTypes = ['.xml', '.json', '.csv', '.zip'];
-
-  if (file.size > maxSize) {
-    uploadError.value = 'File size must be less than 5GB';
-    uploadForm.file = null;
-    return false;
-  }
-
-  const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-  if (!allowedTypes.includes(fileExtension)) {
-    uploadError.value =
-      'File type not supported. Please upload XML, JSON, CSV, or ZIP files.';
-    uploadForm.file = null;
-    return false;
-  }
-
-  return true;
+const handleValidationError = (errors: any[]) => {
+  uploadError.value = errors.map(e => e.reason).join(', ');
 };
 
 const getUploadButtonText = () => {
-  if (fileUpload.uploading.value) {
-    return 'Uploading...';
+  if (healthStore.processing) {
+    return 'Processing...';
   }
-  if (uploadForm.file && uploadForm.file.size > 100 * 1024 * 1024) {
+  if (selectedFiles.value.length > 0 && selectedFiles.value[0].size > 100 * 1024 * 1024) {
     return 'Upload Large File';
   }
   return 'Import Data';
 };
 
 const handleUpload = async () => {
-  if (!uploadForm.source || !uploadForm.file) return;
+  if (!uploadForm.source || selectedFiles.value.length === 0) return;
 
   uploadError.value = '';
   uploadErrorDetails.value = '';
 
   try {
-    // Initialize current import with basic info
+    const file = selectedFiles.value[0];
+    
+    // Initialize current import with proper typing
     currentImport.value = {
-      id: '',
-      user_id: '',
+      id: `import-${Date.now()}`,
+      user_id: '', // Will be set by store
       source_app: uploadForm.source,
       status: 'processing',
       total_records: 0,
       processed_records: 0,
       failed_records: 0,
       error_log: [],
-      metadata: {},
+      metadata: {
+        filename: file.name,
+        filesize: file.size,
+        notes: uploadForm.notes,
+        chunk_size: uploadForm.chunkSize,
+      },
       started_at: new Date().toISOString(),
+      _partitionKey: '', // Will be set by store
     };
 
-    // Process XML file and store embeddings
-    const sessionId = await fileUpload.uploadFile(uploadForm.file, {
-      chunkSize: uploadForm.chunkSize,
+    // Process file using existing upload service
+    await fileUpload.uploadFile(file, {
       onProgress: (progress) => {
         console.log(`Processing progress: ${progress}%`);
-        // Update current import progress if available
         if (currentImport.value) {
-          currentImport.value = {
-            ...currentImport.value,
-            processed_records: Math.round(
-              (progress / 100) * (currentImport.value.total_records || 1)
-            ),
-          };
-        }
-      },
-      onChunkComplete: (chunkIndex, totalChunks) => {
-        console.log(`Chunk ${chunkIndex + 1}/${totalChunks} processed`);
-        // Update total records based on chunks if not set
-        if (currentImport.value && !currentImport.value.total_records) {
-          currentImport.value = {
-            ...currentImport.value,
-            total_records: totalChunks * 100, // Estimate 100 records per chunk
-          };
+          currentImport.value.processed_records = Math.round(
+            (progress / 100) * (currentImport.value.total_records || 1)
+          );
         }
       },
     });
 
-    console.log('File processed successfully:', sessionId);
-
-    // Start server-side processing
-    const payload = {
-      sessionId,
-      source: uploadForm.source,
-      metadata: {
-        filename: uploadForm.file.name,
-        filesize: uploadForm.file.size,
-        filetype: uploadForm.file.type,
-        notes: uploadForm.notes,
-        processed_at: new Date().toISOString(),
-        chunk_size: uploadForm.chunkSize,
-        total_chunks: currentImport.value?.total_records
-          ? Math.ceil(currentImport.value.total_records / 100)
-          : undefined,
-      },
-    };
-
-    const response = await fetch('/api/process-health-file', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Azure Function call failed: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    console.log('Processing completed:', data);
-    currentImport.value = {
-      ...data.importSession,
-      error_log: [...data.importSession.error_log], // Convert readonly array to mutable
-    };
-
-    // Reset form
+    // Clear form
     uploadForm.source = '';
-    uploadForm.file = null;
     uploadForm.notes = '';
-    fileUpload.resetProgress();
+    selectedFiles.value = [];
+    fileUploadRef.value?.clearFiles();
 
     // Refresh import sessions
-    await vectorStore.fetchImportSessions();
+    await healthStore.fetchImportSessions();
   } catch (error: any) {
     console.error('Processing failed:', error);
     uploadError.value = error.message || 'Processing failed. Please try again.';
     uploadErrorDetails.value = error.stack || error.toString();
 
-    // Update current import status on error
     if (currentImport.value) {
-      currentImport.value = {
-        ...currentImport.value,
-        status: 'failed',
-        error_log: [
-          ...(currentImport.value.error_log || []),
-          {
-            error: error.message,
-            timestamp: new Date().toISOString(),
-          },
-        ],
-      };
+      currentImport.value.status = 'failed';
+      currentImport.value.error_log = [
+        ...currentImport.value.error_log,
+        {
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        },
+      ];
     }
   }
 };
@@ -907,7 +758,7 @@ const importSampleData = async () => {
   try {
     const sampleData = generateSampleAppleHealthData();
 
-    const importSession = await vectorStore.importHealthData({
+    const importSession = await healthStore.importHealthData({
       source: 'apple_health',
       data: sampleData,
       metadata: {
@@ -915,13 +766,13 @@ const importSampleData = async () => {
         generated_at: new Date().toISOString(),
         description: 'Sample Apple Health data for demonstration',
       },
+      _partitionKey: '', // Will be set by store
     });
 
     currentImport.value = importSession;
     showSampleData.value = false;
 
-    // Refresh import sessions
-    await vectorStore.fetchImportSessions();
+    await healthStore.fetchImportSessions();
   } catch (error) {
     console.error('Sample data import failed:', error);
     uploadError.value = 'Failed to import sample data';
@@ -993,21 +844,41 @@ const generateSampleAppleHealthData = () => {
   return data;
 };
 
+// Document library helper functions
+const getDocumentTitle = (doc: HealthDocument) => {
+  return doc.title || doc.document_type || 'Untitled Document';
+};
+
+const getDocumentSize = (doc: HealthDocument) => {
+  return doc.metadata?.filesize || 0;
+};
+
+const getDocumentDate = (doc: HealthDocument) => {
+  return doc.created_at;
+};
+
+const getDocumentStatus = (doc: HealthDocument) => {
+  return doc.processed_at ? 'completed' : 'processing';
+};
+
+const getDocumentIcon = (doc: HealthDocument) => {
+  const type = doc.document_type || '';
+  if (type.includes('xml')) return '📋';
+  if (type.includes('json')) return '🔧';
+  if (type.includes('csv')) return '📊';
+  return '📄';
+};
+
+// Utility functions
 const connectSource = (source: any) => {
-  // In a real implementation, this would handle OAuth or API connections
   console.log('Connecting to', source.name);
-  // For demo purposes, show a message
   alert(
     `Connecting to ${source.name} would require OAuth integration in a real implementation.`
   );
 };
 
 const getSourceStatus = (sourceId: string) => {
-  // Check if source is connected
-  const connectedSources = vectorStore.activeDataSources;
-  return connectedSources.some((s) => s.source_type === sourceId)
-    ? 'Connected'
-    : 'Not Connected';
+  return 'Not Connected';
 };
 
 const getStatusIcon = (status: string) => {
@@ -1057,72 +928,33 @@ const formatSourceName = (source: string) => {
   return names[source as keyof typeof names] || source;
 };
 
-const formatFileSize = (bytes: number) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
 const formatDate = (dateString: string) => {
   return format(new Date(dateString), 'MMM d, yyyy HH:mm');
 };
 
-const showErrors = (session: ImportSession) => {
+const showErrors = (session: any) => {
   selectedSession.value = {
     ...session,
-    error_log: [...session.error_log], // Convert readonly array to mutable
+    error_log: [...session.error_log]
   };
 };
 
-const viewImportDetails = (session: ImportSession) => {
+const viewImportDetails = (session: any) => {
   detailsSession.value = {
     ...session,
-    error_log: [...session.error_log], // Convert readonly array to mutable
+    error_log: [...session.error_log]
   };
 };
 
-const viewImportedDocuments = (session: ImportSession) => {
+const viewImportedDocuments = (session: HealthImportSession) => {
   detailsSession.value = null;
-  // Navigate to health documents filtered by this import session
   router.push(`/health?import=${session.id}`);
 };
 
-const handleFileInputClick = () => {
-  if (fileInput.value) {
-    fileInput.value.click();
-  }
-};
-
-// Watch for import progress updates
-watch(
-  () => vectorStore.importSessions,
-  (sessions) => {
-    if (currentImport.value) {
-      const updated = sessions.find((s) => s.id === currentImport.value?.id);
-      if (updated) {
-        currentImport.value = {
-          ...updated,
-          error_log: [...updated.error_log], // Convert readonly array to mutable
-        };
-
-        // Clear current import when completed or failed
-        if (updated.status === 'completed' || updated.status === 'failed') {
-          setTimeout(() => {
-            currentImport.value = null;
-          }, 3000);
-        }
-      }
-    }
-  },
-  { deep: true }
-);
-
 onMounted(async () => {
   await Promise.all([
-    vectorStore.fetchImportSessions(),
-    vectorStore.fetchDataSources(),
+    healthStore.fetchImportSessions(),
+    healthStore.fetchDocuments(),
   ]);
 });
 </script>

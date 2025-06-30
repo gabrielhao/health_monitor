@@ -2,7 +2,7 @@
   <div class="p-6 max-w-7xl mx-auto">
     <!-- Header -->
     <div class="mb-8">
-      <h1 class="text-3xl font-bold text-neutral-900">Document Import for RAG</h1>
+      <h1 class="text-3xl font-bold text-neutral-900">Import Documents</h1>
       <p class="text-neutral-600 mt-1">Upload and process documents for AI-powered search and retrieval</p>
     </div>
 
@@ -261,7 +261,7 @@
       <div v-else-if="ragStore.documents.length === 0" class="text-center py-12">
         <DocumentIcon class="w-16 h-16 text-neutral-400 mx-auto mb-4" />
         <h3 class="text-lg font-medium text-neutral-900 mb-2">No documents yet</h3>
-        <p class="text-neutral-500">Upload your first documents to get started with RAG</p>
+        <p class="text-neutral-500">Upload your first documents to enable AI-powered answers based on your own content.</p>
       </div>
       
       <div v-else class="space-y-4">
