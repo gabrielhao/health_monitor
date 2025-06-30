@@ -1,17 +1,21 @@
 # Aivital - AI-Powered Health Monitoring & Data Import Platform
 
-A comprehensive health tracking application with advanced data import capabilities, vector database integration, and AI-powered insights. Built with Vue 3, TypeScript, and Supabase.
+A comprehensive health tracking application with advanced data import capabilities, vector database integration, and AI-powered insights. Built with Vue 3, TypeScript, and Azure services.
 
 ![Vue 3](https://img.shields.io/badge/Vue-3.4.38-4FC08D?style=flat&logo=vue.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.3-3178C6?style=flat&logo=typescript&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-2.45.4-3ECF8E?style=flat&logo=supabase&logoColor=white)
+![Azure Cosmos DB](https://img.shields.io/badge/Azure_Cosmos_DB-2.45.4-0078D4?style=flat&logo=azure-cosmos-db&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4.10-38B2AC?style=flat&logo=tailwind-css&logoColor=white)
+
+![Aivital Application Screenshot](public/app_screen.png)
+
+*Screenshot of the Aivital health monitoring dashboard showing the modern, clean interface with health metrics visualization and AI chat integration.*
 
 ## 🌟 Key Features
 
 ### 🔐 **Secure Authentication & Privacy**
-- Email/password authentication with Supabase Auth
-- Row-level security (RLS) for complete data isolation
+- Microsoft Entra External ID authentication
+- Azure Cosmos DB with built-in security
 - Comprehensive privacy controls and settings
 - Secure password reset functionality
 
@@ -42,48 +46,83 @@ A comprehensive health tracking application with advanced data import capabiliti
 - **Vector Database Storage** - All imported data becomes searchable
 
 ### 🔍 **Vector Database & RAG**
-- **pgvector** integration for semantic search
+- **Azure Cosmos DB** with vector search capabilities
 - **Automatic embedding generation** for all health documents
 - **Similarity search** across your entire health history
 - **Context-aware AI responses** using your personal data
+
+## 📱 Application Screenshots
+
+### Dashboard Overview
+![Dashboard](public/app_dashboard.png)
+*Main dashboard showing health metrics overview, recent activity, and quick access to key features.*
+
+
+### AI Health Assistant
+![AI Chat](public/app_chat.png)
+*AI-powered health assistant interface with context-aware conversations and personalized health advice based on your data.*
+
+### Data Import Interface
+![Data Import](public/app_import.png)
+*Universal data import system supporting Apple Health, Google Fit, Fitbit, and manual file uploads with real-time progress tracking.*
+
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - **Node.js 18+** and npm
-- **Supabase account** (free tier available)
+- **Azure account** with Cosmos DB, Blob Storage, and Key Vault
+- **Microsoft Entra External ID** tenant setup
 
 ### 1. Clone & Install
 ```bash
 git clone <repository-url>
-cd aivital
+cd health_monitor
 npm install
 ```
 
 ### 2. Environment Setup
 ```bash
-cp .env.example .env
+cp env.azure.example .env.local
 ```
 
-Edit `.env` with your Supabase credentials:
+Edit `.env.local` with your Azure credentials:
 ```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_APP_NAME=Aivital
-VITE_APP_VERSION=1.0.0
+# Microsoft Entra External ID Configuration
+VITE_AZURE_CLIENT_ID=your-external-id-app-client-id
+VITE_AZURE_TENANT_ID=your-external-id-tenant-id
+VITE_AZURE_EXTERNAL_ID_DOMAIN=yourtenant.ciamlogin.com
+
+# Azure Cosmos DB Configuration
+VITE_AZURE_COSMOS_ENDPOINT=https://your-cosmos-account.documents.azure.com:443/
+VITE_AZURE_COSMOS_KEY=your-cosmos-key
+VITE_AZURE_COSMOS_DATABASE=HealthMonitorDB
+
+# Azure Blob Storage Configuration
+VITE_AZURE_STORAGE_ACCOUNT=your-storage-account-name
+VITE_AZURE_STORAGE_CONTAINER=health-files
+AZURE_STORAGE_CONNECTION_STRING=your-connection-string
+
+# OpenAI API Configuration
+VITE_OPENAI_API_KEY=your-openai-api-key
+VITE_OPENAI_MODEL=text-embedding-3-small
+
+# Backend Service Configuration
+VITE_BACKEND_SERVICE_URL=http://localhost:3001/api
 ```
 
-### 3. Database Setup
-The database migrations will automatically create:
-- **User profiles** with health information
-- **Health metrics** tracking system
-- **Vector database** with pgvector extension
-- **Import system** for external data
-- **Chat system** with AI integration
-- **Analytics** data aggregation
+### 3. Backend Service Setup
+```bash
+cd backend-service
+npm install
+cp env.example .env
+# Configure backend environment variables
+npm run dev
+```
 
 ### 4. Start Development
 ```bash
+# In the root directory
 npm run dev
 ```
 Access the application at `http://localhost:5173`
@@ -156,55 +195,45 @@ For testing purposes, you can create a new account or use these sample credentia
 
 ## 🗄️ Database Schema
 
-### Core Tables
+### Core Collections (Azure Cosmos DB)
 - **`user_profiles`** - User information and preferences
 - **`health_metrics`** - Individual health measurements
 - **`chat_messages`** - AI conversation history
 - **`analytics_data`** - Aggregated health analytics
 
-### Vector Database Tables
+### Vector Database Collections
 - **`health_documents`** - Imported health documents
 - **`health_embeddings`** - Vector embeddings for RAG
 - **`import_sessions`** - Import tracking and progress
 - **`data_sources`** - Connected health app integrations
 
 ### Security
-- **Row-Level Security (RLS)** on all tables
+- **Azure Cosmos DB** built-in security features
+- **Microsoft Entra External ID** authentication
 - **User isolation** - Users can only access their own data
 - **Encrypted tokens** for external service connections
 
 ## 📁 Project Structure
 
 ```
-src/
-├── components/
-│   └── shared/           # Reusable components
-├── pages/
-│   ├── AuthPage.vue      # Authentication
-│   ├── DashboardPage.vue # Main dashboard
-│   ├── HealthPage.vue    # Health metrics
-│   ├── ChatPage.vue      # AI chat interface
-│   ├── AnalyticsPage.vue # Analytics dashboard
-│   ├── ProfilePage.vue   # User profile
-│   └── DataImportPage.vue # Data import interface
-├── stores/
-│   ├── auth.ts           # Authentication state
-│   ├── health.ts         # Health metrics state
-│   ├── chat.ts           # Chat state
-│   └── vector.ts         # Vector database state
-├── services/
-│   ├── supabase.ts       # Supabase client
-│   └── vectorService.ts  # Vector operations
-├── types/
-│   ├── index.ts          # Core types
-│   ├── database.ts       # Database types
-│   └── vector.ts         # Vector database types
-└── router/               # Vue Router configuration
-
-supabase/
-├── migrations/           # Database migrations
-└── functions/            # Edge functions
-    └── generate-embeddings/ # Vector embedding generation
+health_monitor/
+├── src/                    # Frontend Vue application
+│   ├── components/         # Vue components
+│   ├── pages/             # Page components
+│   ├── stores/            # Pinia state management
+│   ├── services/          # API and external services
+│   └── types/             # TypeScript type definitions
+├── backend-service/        # Node.js backend API
+│   ├── src/
+│   │   ├── services/      # Business logic services
+│   │   └── routes/        # API routes
+│   └── README.md          # Backend documentation
+├── azure-functions/        # Azure Functions
+│   ├── generate-embeddings/    # Vector embedding generation
+│   ├── generate-query-embedding/ # Query embedding
+│   └── process-health-file/     # File processing
+├── infrastructure/         # Azure infrastructure setup
+└── public/                # Static assets
 ```
 
 ## 🔧 Available Scripts
@@ -218,6 +247,7 @@ npm run preview         # Preview production build
 # Testing
 npm run test            # Run unit tests
 npm run test:ui         # Run tests with UI
+npm run test:integration # Run integration tests
 
 # Code Quality
 npm run lint            # Lint code
@@ -227,7 +257,7 @@ npm run type-check      # TypeScript type checking
 ## 🎯 How to Use Aivital
 
 ### Getting Started
-1. **Sign Up**: Create account with email/password
+1. **Sign Up**: Create account with Microsoft Entra External ID
 2. **Complete Profile**: Add basic health information
 3. **Import Data**: Upload health data from other apps
 4. **Start Tracking**: Add manual health metrics
@@ -251,9 +281,9 @@ npm run type-check      # TypeScript type checking
 
 ### Data Protection
 - **End-to-end encryption** for all data transmission
-- **Row-level security** ensures complete data isolation
+- **Azure Cosmos DB** built-in security features
+- **Microsoft Entra External ID** authentication
 - **Privacy controls** - Configure what data is shared
-- **Secure authentication** with Supabase Auth
 - **GDPR compliant** data handling
 
 ### Vector Database Security
@@ -267,8 +297,10 @@ npm run type-check      # TypeScript type checking
 ### Environment Variables
 ```env
 # Required
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_AZURE_CLIENT_ID=your-external-id-app-client-id
+VITE_AZURE_COSMOS_ENDPOINT=your-cosmos-endpoint
+VITE_AZURE_COSMOS_KEY=your-cosmos-key
+VITE_OPENAI_API_KEY=your-openai-api-key
 
 # Optional
 VITE_APP_NAME=Aivital
@@ -284,10 +316,10 @@ npm run build
 ```
 
 **Recommended Platforms:**
+- Azure Static Web Apps
 - Netlify (with automatic deployments)
 - Vercel
 - AWS S3 + CloudFront
-- Firebase Hosting
 
 ## 🔧 Troubleshooting
 
@@ -295,32 +327,32 @@ npm run build
 
 **Import Failures:**
 - Check file format (XML, JSON, CSV supported)
-- Verify file size (max 50MB)
+- Verify file size (max 5GB)
 - Ensure proper source selection
 - Review error logs in import history
 
 **Vector Search Not Working:**
-- Verify pgvector extension is enabled
+- Verify Azure Cosmos DB vector search is enabled
 - Check embedding generation function
 - Ensure sufficient imported data
 - Review database permissions
 
 **Authentication Problems:**
-- Verify Supabase credentials in `.env`
-- Check RLS policies are properly configured
-- Ensure email confirmation settings
+- Verify Microsoft Entra External ID configuration
+- Check Azure Cosmos DB access policies
+- Ensure proper tenant configuration
 - Review browser console for errors
 
 **Performance Issues:**
 - Clear browser cache and localStorage
 - Check network connectivity
-- Verify database indexes are created
-- Monitor Supabase usage limits
+- Verify Azure Cosmos DB indexes are created
+- Monitor Azure service usage limits
 
 ### Getting Help
 1. Check the [Issues](../../issues) page
 2. Review error logs in browser console
-3. Check Supabase dashboard for database errors
+3. Check Azure portal for service errors
 4. Create detailed issue reports with steps to reproduce
 
 ## 🔮 Roadmap
@@ -351,16 +383,16 @@ npm run build
 - **Vue Router** for navigation
 
 ### Backend & Database
-- **Supabase** (PostgreSQL + Auth + Storage)
-- **pgvector** for vector operations
-- **Row-Level Security** for data isolation
-- **Edge Functions** for serverless processing
+- **Azure Cosmos DB** with vector search
+- **Azure Blob Storage** for file storage
+- **Azure Functions** for serverless processing
+- **Microsoft Entra External ID** for authentication
 
 ### AI & Vector Processing
+- **OpenAI API** for embeddings and chat
 - **Vector embeddings** for semantic search
 - **RAG (Retrieval-Augmented Generation)**
 - **Similarity search** with cosine distance
-- **Automatic content chunking**
 
 ### Development Tools
 - **Vite** for fast development
@@ -380,7 +412,7 @@ npm run build
 - Follow TypeScript best practices
 - Write tests for new features
 - Update documentation for API changes
-- Ensure RLS policies for new database tables
+- Ensure Azure Cosmos DB security policies
 - Test vector database operations thoroughly
 
 ## 📝 License
