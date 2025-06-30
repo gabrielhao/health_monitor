@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue'
-import { azureBlob } from '@/services/azureBlob'
-import { azureCosmos } from '@/services/azureCosmos'
+import { NodeFileUploadService } from '@/services/nodeFileUploadService'
 import { useAuthStore } from '@/stores/auth'
 
 export interface UploadProgress {
@@ -66,60 +65,66 @@ export function useFileUpload() {
       speed: 0,
       eta: 0,
       currentChunk: 0,
-      totalChunks: 1 // For Azure Blob storage, we treat it as a single chunk
+      totalChunks: 1
     }
 
     try {
-      // Create a unique file path: userId/timestamp_filename
-      const timestamp = Date.now()
-      const fileName = `${authStore.user.id}/${timestamp}_${file.name}`
+      // Use backend service for file upload
+      console.log('[useFileUpload] Using backend upload service...')
+      
+      // Initialize the Node file upload service
+      const nodeUploadService = new NodeFileUploadService({
+        baseUrl: import.meta.env.VITE_BACKEND_SERVICE_URL || 'http://localhost:3001/api'
+      })
 
-      console.log('[useFileUpload] Uploading to Azure Blob storage:', { fileName })
+      // Simulate progress for the upload process
+      updateProgress(25, file.size)
+      options.onProgress?.(25)
 
-      // Upload file to Azure Blob storage with progress tracking
-      const uploadResult = await azureBlob.uploadFile(fileName, file, 'health-files', {
-        onProgress: (bytesUploaded: number) => {
-          const percentage = (bytesUploaded / file.size) * 100
-          updateProgress(percentage, file.size)
-          options.onProgress?.(percentage)
+      // Upload file to backend service with health-specific metadata
+      const uploadResult = await nodeUploadService.uploadFile(
+        file,
+        authStore.user.id,
+        {
+          source_app: 'web-upload',
+          document_type: 'health-data',
+          upload_timestamp: new Date().toISOString(),
+          original_filename: file.name,
+          file_type: file.type
         }
-      })
+      )
 
-      console.log('[useFileUpload] File uploaded to storage:', uploadResult)
+      console.log('[useFileUpload] File uploaded to backend:', uploadResult)
 
-      // Update progress to 90% after upload
-      updateProgress(90, file.size)
-      options.onProgress?.(90)
+      // Update progress to 75% after upload
+      updateProgress(75, file.size)
+      options.onProgress?.(75)
 
-      // Insert metadata into Azure Cosmos DB
-      const documentData = await azureCosmos.createHealthDocument({
-        user_id: authStore.user.id,
-        title: file.name,
-        file_name: file.name,
-        file_type: file.type,
-        file_url: uploadResult.url,
-        size_bytes: file.size,
-        source_app: 'web-upload',
-        document_type: 'user-upload'
-      })
-
-      console.log('[useFileUpload] File metadata saved:', documentData)
-
-      // Update progress to 100%
+      // Final progress update
       updateProgress(100, file.size)
       options.onProgress?.(100)
       options.onChunkComplete?.(0, 1)
 
       console.log('[useFileUpload] Upload completed successfully:', { 
-        documentId: documentData.id,
-        fileUrl: uploadResult.url 
+        documentId: uploadResult.documentId,
+        fileUrl: uploadResult.url,
+        filePath: uploadResult.path
       })
 
-      return documentData.id
+      return uploadResult.documentId
     } catch (err: any) {
       console.error('[useFileUpload] Upload failed:', err)
-      error.value = err.message || 'Upload failed'
-      throw err
+      
+      // Provide helpful error messages based on common issues
+      if (err.message.includes('fetch')) {
+        error.value = 'Cannot connect to backend service. Please ensure the backend is running.'
+      } else if (err.message.includes('timeout')) {
+        error.value = 'Upload timed out. Please try again or check your connection.'
+      } else {
+        error.value = err.message || 'Upload failed'
+      }
+      
+      throw new Error(error.value)
     } finally {
       uploading.value = false
     }

@@ -23,13 +23,28 @@ class AzureBlobService {
 
   async initialize(): Promise<void> {
     if (!this.blobServiceClient) {
-      this.blobServiceClient = await createBlobServiceClient()
-      
-      // Ensure container exists
-      const containerClient = this.blobServiceClient.getContainerClient(this.containerName)
-      await containerClient.createIfNotExists()
-      
-      console.log('Azure Blob Storage initialized successfully')
+      try {
+        this.blobServiceClient = await createBlobServiceClient()
+        
+        // Ensure container exists
+        const containerClient = this.blobServiceClient.getContainerClient(this.containerName)
+        await containerClient.createIfNotExists()
+        
+        console.log('Azure Blob Storage initialized successfully')
+      } catch (error: any) {
+        console.error('Failed to initialize Azure Blob Storage:', error)
+        
+        // Provide more helpful error messages
+        if (error.code === 'ENOTFOUND' || error.message.includes('connection')) {
+          throw new Error('Azure Storage connection failed. Please check your connection string and network connectivity.')
+        } else if (error.message.includes('credential') || error.message.includes('authentication')) {
+          throw new Error('Azure Storage authentication failed. Please check your credentials and connection string.')
+        } else if (error.message.includes('environment variable')) {
+          throw new Error('Azure Storage configuration missing. Please set up your environment variables (VITE_AZURE_STORAGE_CONNECTION_STRING).')
+        } else {
+          throw new Error(`Azure Storage initialization failed: ${error.message}`)
+        }
+      }
     }
   }
 
