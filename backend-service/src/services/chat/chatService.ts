@@ -73,21 +73,28 @@ class ChatService {
 
   async initialize(): Promise<void> {
     try {
+      console.log('Initializing chat service');
       const endpoint = process.env.AZURE_OPENAI_CHAT_ENDPOINT || "https://health-monitor-openai.openai.azure.com/";
       const apiVersion = "2024-05-01-preview"; // Required for Assistants API
       const modelName = process.env.AZURE_OPENAI_CHAT_MODEL || "gpt-4.1";
       const deployment = process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || "gpt-4.1";
       const vectorStoreId = process.env.AZURE_OPENAI_VECTOR_STORE_ID || "vs_hpVCuZvyz7mBRHLnS9IrXsvl";
+      const azureOpenAIKey = (process.env.AZURE_OPENAI_CHAT_API_KEY || ""); 
 
+      console.log('endpoint', endpoint);
+      console.log('apiVersion', apiVersion);
+      console.log('modelName', modelName);
+      console.log('deployment', deployment);
+      console.log('vectorStoreId', vectorStoreId);
              // Use DefaultAzureCredential for authentication
-       const credential = new DefaultAzureCredential();
-       const scope = "https://cognitiveservices.azure.com/.default";
-       const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+       //const credential = new DefaultAzureCredential();
+       //const scope = "https://cognitiveservices.azure.com/.default";
+       //const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
        this.client = new AzureOpenAI({
-         endpoint,
-         azureADTokenProvider,
-         apiVersion
+         endpoint: endpoint,
+         apiVersion: apiVersion,
+         apiKey: azureOpenAIKey
        });
 
       // Set the config so the service is considered initialized
@@ -139,8 +146,8 @@ class ChatService {
       }
 
       // Create new assistant
-  const assistantOptions = {
-        model: "gpt-4.1", // replace with model deployment name
+      const assistantOptions = {
+        model: this.config.deployment, // Use the deployment name from config
         name: "health_aivital_assistant",
         input: "user_message",
         instructions: `You are a knowledgeable and supportive health assistant. You have access to the user's personal health data and should provide insights, explanations, and guidance based on this information.
@@ -164,10 +171,10 @@ class ChatService {
     - Provide actionable insights where appropriate
     - Maintain a supportive and professional tone`,
         tools: [{ type: "file_search" as const }],
-        tool_resources: { file_search: { vector_store_ids: ["vs_hpVCuZvyz7mBRHLnS9IrXsvl"] }},
+        tool_resources: { file_search: { vector_store_ids: [this.config.vectorStoreId!] }},
         temperature: 1,
         top_p: 1
-  };
+      };
 
 try {
   const assistantResponse = await this.client.beta.assistants.create(assistantOptions);

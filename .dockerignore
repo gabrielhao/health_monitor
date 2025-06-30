@@ -1,0 +1,84 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (for security)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+backend-service/.env
+backend-service/.env.local
+
+# Git files
+.git
+.gitignore
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build outputs (will be created during build)
+dist
+build
+coverage
+
+# Logs
+logs
+*.log
+
+# Test files
+*.test.ts
+*.test.js
+test/
+__tests__/
+coverage/
+
+# Documentation
+*.md
+README*
+docs/
+
+# Development files
+docker-compose.yml
+docker-compose.override.yml
+azure-config.env
+
+# Azure deployment files
+deploy-azure.sh
+
+# Azure configuration files
+azure-functions/
+infrastructure/
+
+# Temporary files
+tmp/
+temp/
+
+# Cache directories
+.cache
+.eslintcache
+.npm
+
+# Editor directories and files
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw? 
