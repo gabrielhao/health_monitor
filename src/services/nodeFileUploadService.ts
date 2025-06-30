@@ -1,4 +1,4 @@
-import type { UploadProgress } from '@/composables/useFileUpload'
+// import type { UploadProgress } from '@/composables/useFileUpload' // Removed unused import
 import type { 
   UploadResult, 
   BatchUploadResult, 

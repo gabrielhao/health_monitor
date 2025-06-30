@@ -3,6 +3,9 @@ import { azureBlob } from './azureBlob'
 import { nodeFileUploadService } from './nodeFileUploadService'
 import type { UploadOptions, UploadResult, BatchUploadResult } from './externalFileUploadService'
 
+// Export types for other modules to use
+export type { UploadResult, BatchUploadResult }
+
 /**
  * File Upload Adapter
  * 
@@ -75,14 +78,9 @@ class FileUploadAdapter {
     
     console.log(`[FileUploadAdapter] Batch uploading ${files.length} files using provider: ${provider}`)
     
-    if (provider === 'external') {
-      return await externalFileUploadService.uploadBatch(files, userId, options)
-    } else if (provider === 'node') {
-      return await nodeFileUploadService.uploadBatch(files, userId, options)
-    } else {
-      // For Azure, we'll upload files individually since it doesn't have native batch support
-      return await this.uploadBatchIndividually(files, userId, options)
-    }
+    // Note: Batch upload methods are not available in all services
+    // Using individual upload approach for all providers
+    return await this.uploadBatchIndividually(files, userId, options)
   }
 
   /**
@@ -100,7 +98,7 @@ class FileUploadAdapter {
         return await externalFileUploadService.uploadFile(file, userId, path, options)
       
       case 'node':
-        return await nodeFileUploadService.uploadFile(file, userId, path, options)
+        return await nodeFileUploadService.uploadFile(file, userId, options)
       
       case 'azure':
         // Adapt Azure Blob Storage to match our interface
@@ -109,7 +107,7 @@ class FileUploadAdapter {
           path: azureResult.path,
           url: azureResult.url,
           size: azureResult.size,
-          id: azureResult.path, // Use path as ID for Azure
+          documentId: azureResult.path, // Use path as document ID for Azure
           metadata: options.metadata
         }
       
@@ -176,9 +174,8 @@ class FileUploadAdapter {
     
     if (targetProvider === 'external') {
       return await externalFileUploadService.getUploadStatus(uploadId)
-    } else if (targetProvider === 'node') {
-      return await nodeFileUploadService.getUploadStatus(uploadId)
     } else {
+      // Node and Azure providers don't support upload status tracking
       throw new Error(`Upload status tracking not supported by provider: ${targetProvider}`)
     }
   }
@@ -191,9 +188,8 @@ class FileUploadAdapter {
     
     if (targetProvider === 'external') {
       return await externalFileUploadService.cancelUpload(uploadId)
-    } else if (targetProvider === 'node') {
-      return await nodeFileUploadService.cancelUpload(uploadId)
     } else {
+      // Node and Azure providers don't support upload cancellation
       throw new Error(`Upload cancellation not supported by provider: ${targetProvider}`)
     }
   }

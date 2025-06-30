@@ -399,12 +399,12 @@ const handleUpdateProfile = async () => {
 
   try {
     const updates: Partial<UserProfile> = {
-      full_name: profileForm.full_name || null,
-      date_of_birth: profileForm.date_of_birth || null,
-      gender: profileForm.gender || null,
-      height: profileForm.height || null,
-      weight: profileForm.weight || null,
-      emergency_contact: profileForm.emergency_contact || null,
+      full_name: profileForm.full_name || undefined,
+      date_of_birth: profileForm.date_of_birth || undefined,
+              gender: (profileForm.gender as 'male' | 'female' | 'other' | 'prefer_not_to_say') || undefined,
+      height: profileForm.height || undefined,
+      weight: profileForm.weight || undefined,
+      emergency_contact: profileForm.emergency_contact || undefined,
       medical_conditions: profileForm.medical_conditions,
       medications: profileForm.medications,
       privacy_settings: profileForm.privacy_settings,

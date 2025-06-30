@@ -6,6 +6,8 @@ import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Import services
 import { initializeChatService } from './services/chat/index.js';
@@ -24,6 +26,10 @@ import uploadRoutes from './services/upload/routes/upload.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// Get current directory (for ES modules)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Security middleware
 app.use(helmet());
@@ -52,6 +58,10 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve static files from the frontend build
+const publicPath = path.join(__dirname, '..', 'public');
+app.use(express.static(publicPath));
+
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
@@ -79,12 +89,17 @@ app.use('/api/embedding', embeddingRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/health', healthRoutes);
 
-// 404 handler
-app.use('*', (req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'Endpoint not found',
-    });
+// Catch-all handler: send back Vue.js frontend for any non-API routes
+app.get('*', (req, res) => {
+    // Only serve frontend for non-API routes
+    if (!req.path.startsWith('/api/')) {
+        res.sendFile(path.join(publicPath, 'index.html'));
+    } else {
+        res.status(404).json({
+            success: false,
+            error: 'API endpoint not found',
+        });
+    }
 });
 
 // Error handling middleware

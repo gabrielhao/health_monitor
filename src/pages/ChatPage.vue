@@ -284,7 +284,7 @@ const getQuickInsight = async (insightType: 'sleep' | 'activity' | 'heart_rate' 
       general: "Provide a comprehensive overview of my health metrics and overall wellness trends."
     }
     
-    const query = queries[insightType]
+    const query = queries[insightType as keyof typeof queries] ?? "I don't have enough data to analyze that health metric yet."
     newMessage.value = query
     await sendMessage()
     

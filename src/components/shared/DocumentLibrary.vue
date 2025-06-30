@@ -69,9 +69,9 @@ import { computed } from 'vue'
 import { format } from 'date-fns'
 import {
   DocumentIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  XCircleIcon,
+  // CheckCircleIcon, // Removed unused icons
+  // ClockIcon,
+  // XCircleIcon,
   TrashIcon,
 } from '@heroicons/vue/24/outline'
 

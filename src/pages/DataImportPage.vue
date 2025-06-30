@@ -575,9 +575,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useHealthStore } from '@/stores/health';
-import { useRouter } from 'vue-router';
 import { useFileUpload } from '@/composables/useFileUpload';
-import { useFileValidation } from '@/composables/useFileValidation';
 import { format } from 'date-fns';
 import FileUploadDropZone from '@/components/shared/FileUploadDropZone.vue';
 import UploadProgressList from '@/components/shared/UploadProgressList.vue';
@@ -585,25 +583,23 @@ import DocumentLibrary from '@/components/shared/DocumentLibrary.vue';
 import type { HealthImportSession, HealthDocument } from '@/types/health';
 import type { UploadProgressItem } from '@/composables/useUploadProgress';
 import {
-  CloudArrowUpIcon,
+  // CloudArrowUpIcon, // Removed unused icon
   DevicePhoneMobileIcon,
   CloudIcon,
   BeakerIcon,
-  CheckCircleIcon,
   ExclamationCircleIcon,
   ClockIcon,
-  XCircleIcon,
 } from '@heroicons/vue/24/outline';
 
 const healthStore = useHealthStore();
-const router = useRouter();
+// const router = useRouter(); // Removed unused router
 const fileUpload = useFileUpload();
-const { getFileIcon } = useFileValidation();
+// const { getFileIcon } = useFileValidation(); // Removed unused function
 
 const showSampleData = ref(false);
 // Import history related refs - COMMENTED OUT
 // const selectedSession = ref<HealthImportSession | null>(null);
-// const detailsSession = ref<HealthImportSession | null>(null);
+const detailsSession = ref<HealthImportSession | null>(null);
 const currentImport = ref<HealthImportSession | null>(null);
 const fileUploadRef = ref();
 const uploadError = ref('');
@@ -882,19 +878,10 @@ const connectSource = (source: any) => {
   );
 };
 
-const getSourceStatus = (sourceId: string) => {
+const getSourceStatus = (_sourceId: string) => {
   return 'Not Connected';
 };
 
-const getStatusIcon = (status: string) => {
-  const icons = {
-    pending: ClockIcon,
-    processing: ClockIcon,
-    completed: CheckCircleIcon,
-    failed: XCircleIcon,
-  };
-  return icons[status as keyof typeof icons] || ClockIcon;
-};
 
 const getStatusColor = (status: string) => {
   const colors = {
@@ -937,27 +924,14 @@ const formatDate = (dateString: string) => {
   return format(new Date(dateString), 'MMM d, yyyy HH:mm');
 };
 
-// Import history functions - COMMENTED OUT
-/*
-const showErrors = (session: any) => {
-  selectedSession.value = {
-    ...session,
-    error_log: [...session.error_log]
-  };
-};
+// Import history functions
 
-const viewImportDetails = (session: any) => {
-  detailsSession.value = {
-    ...session,
-    error_log: [...session.error_log]
-  };
-};
 
 const viewImportedDocuments = (session: HealthImportSession) => {
   detailsSession.value = null;
-  router.push(`/health?import=${session.id}`);
+  // router.push(`/health?import=${session.id}`); // Router not available
+  console.log('View imported documents for session:', session.id);
 };
-*/
 
 onMounted(async () => {
   await Promise.all([

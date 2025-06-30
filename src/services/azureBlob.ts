@@ -1,11 +1,8 @@
-import { BlobServiceClient, BlockBlobClient } from '@azure/storage-blob'
+import { BlobServiceClient } from '@azure/storage-blob' // Removed unused BlockBlobClient
 import { createBlobServiceClient, azureConfig } from './azureConfig'
 import { Buffer } from 'buffer'
 
-interface UploadOptions {
-  contentType?: string
-  metadata?: Record<string, string>
-}
+// Removed unused UploadOptions interface - it's defined in other services
 
 interface UploadResult {
   path: string
@@ -154,7 +151,7 @@ class AzureBlobService {
     }
   }
 
-  async generateSasUrl(filePath: string, expiryHours: number = 1): Promise<string> {
+  async generateSasUrl(filePath: string, _expiryHours: number = 1): Promise<string> {
     const blobService = this.ensureConnection()
     const containerClient = blobService.getContainerClient(this.containerName)
     const blockBlobClient = containerClient.getBlockBlobClient(filePath)

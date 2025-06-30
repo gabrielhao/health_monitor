@@ -1,7 +1,7 @@
 import { azureCosmos } from './azureCosmos'
 import { azureBlob } from './azureBlob'
 import { azureEmbedding } from './azureEmbedding'
-import type { RAGDocument, RAGChunk, RAGImportSession, RAGProcessingOptions } from '@/types/rag'
+import type { RAGDocument, RAGChunk, RAGImportSession } from '@/types/rag' // Removed unused RAGProcessingOptions
 
 export class RAGService {
   private static readonly SUPPORTED_FORMATS = [
@@ -104,42 +104,7 @@ export class RAGService {
     return result.path
   }
 
-  private static async readFileContent(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      
-      reader.onload = (event) => {
-        const result = event.target?.result
-        if (typeof result === 'string') {
-          resolve(result)
-        } else {
-          // Handle binary files by converting to base64
-          const arrayBuffer = result as ArrayBuffer
-          const uint8Array = new Uint8Array(arrayBuffer)
-          const binaryString = Array.from(uint8Array)
-            .map(byte => String.fromCharCode(byte))
-            .join('')
-          resolve(btoa(binaryString))
-        }
-      }
-      
-      reader.onerror = () => reject(new Error('Failed to read file'))
-      
-      // Try to read as text first, fallback to binary
-      if (file.type.startsWith('text/') || 
-          file.type === 'application/json' || 
-          file.type === 'application/xml') {
-        reader.readAsText(file)
-      } else {
-        reader.readAsArrayBuffer(file)
-      }
-    })
-  }
 
-  private static estimateTokenCount(text: string): number {
-    // Simple token estimation (roughly 4 characters per token)
-    return Math.ceil(text.length / 4)
-  }
 
   static async getDocuments(userId: string, limit = 50): Promise<RAGDocument[]> {
     const documents = await azureCosmos.getRagDocuments(userId, { limit })
@@ -207,23 +172,6 @@ export class RAGService {
 
     // Delete document
     await azureCosmos.deleteRagDocument(documentId, userId)
-  }
-
-  private static async callAzureFunction(functionName: string, body: any): Promise<any> {
-    // Call Azure Function using HTTP request
-    const response = await fetch(`/api/${functionName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body)
-    })
-
-    if (!response.ok) {
-      throw new Error(`Azure Function call failed: ${response.statusText}`)
-    }
-
-    return await response.json()
   }
 
   static getFileIcon(fileType: string): string {

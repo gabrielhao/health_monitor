@@ -163,8 +163,8 @@ class ChatService {
     - Explain trends or patterns you observe
     - Provide actionable insights where appropriate
     - Maintain a supportive and professional tone`,
-        tools: [{"type":"file_search"}],
-        tool_resources: {"file_search":{"vector_store_ids":["vs_hpVCuZvyz7mBRHLnS9IrXsvl"]}},
+        tools: [{ type: "file_search" as const }],
+        tool_resources: { file_search: { vector_store_ids: ["vs_hpVCuZvyz7mBRHLnS9IrXsvl"] }},
         temperature: 1,
         top_p: 1
   };

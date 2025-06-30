@@ -106,7 +106,7 @@ import {
   XMarkIcon,
   Bars3Icon,
   CloudArrowUpIcon,
-  DocumentTextIcon,
+  // DocumentTextIcon, // Removed unused icon
 } from '@heroicons/vue/24/outline';
 
 const route = useRoute();

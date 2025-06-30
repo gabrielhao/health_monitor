@@ -188,13 +188,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue'; // Removed unused computed
 import { useHealthStore } from '@/stores/health';
 import {
   ChartBarIcon,
   ChartPieIcon,
-  TrendingUpIcon,
-  TrendingDownIcon,
+  // TrendingUpIcon, // Icon doesn't exist in this version
+  // TrendingDownIcon, // Icon doesn't exist in this version
   ExclamationTriangleIcon,
   InformationCircleIcon,
   CheckCircleIcon,
