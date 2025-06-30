@@ -312,7 +312,8 @@
       class="mb-8"
     />
 
-    <!-- Import History -->
+    <!-- Import History - COMMENTED OUT -->
+    <!--
     <div class="card">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-neutral-900">Import History</h2>
@@ -397,6 +398,7 @@
         </div>
       </div>
     </div>
+    -->
 
     <!-- Sample Data Modal -->
     <div
@@ -426,7 +428,8 @@
       </div>
     </div>
 
-    <!-- Error Details Modal -->
+    <!-- Error Details Modal - COMMENTED OUT -->
+    <!--
     <div
       v-if="selectedSession"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -455,7 +458,7 @@
       </div>
     </div>
 
-    <!-- Import Details Modal -->
+    <!-- Import Details Modal - COMMENTED OUT -->
     <div
       v-if="detailsSession"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -565,6 +568,7 @@
         </div>
       </div>
     </div>
+    -->
   </div>
 </template>
 
@@ -597,8 +601,9 @@ const fileUpload = useFileUpload();
 const { getFileIcon } = useFileValidation();
 
 const showSampleData = ref(false);
-const selectedSession = ref<HealthImportSession | null>(null);
-const detailsSession = ref<HealthImportSession | null>(null);
+// Import history related refs - COMMENTED OUT
+// const selectedSession = ref<HealthImportSession | null>(null);
+// const detailsSession = ref<HealthImportSession | null>(null);
 const currentImport = ref<HealthImportSession | null>(null);
 const fileUploadRef = ref();
 const uploadError = ref('');
@@ -734,8 +739,8 @@ const handleUpload = async () => {
     selectedFiles.value = [];
     fileUploadRef.value?.clearFiles();
 
-    // Refresh import sessions
-    await healthStore.fetchImportSessions();
+    // Refresh import sessions - COMMENTED OUT
+    // await healthStore.fetchImportSessions();
   } catch (error: any) {
     console.error('Processing failed:', error);
     uploadError.value = error.message || 'Processing failed. Please try again.';
@@ -772,7 +777,7 @@ const importSampleData = async () => {
     currentImport.value = importSession;
     showSampleData.value = false;
 
-    await healthStore.fetchImportSessions();
+    // await healthStore.fetchImportSessions(); // COMMENTED OUT - import history removed
   } catch (error) {
     console.error('Sample data import failed:', error);
     uploadError.value = 'Failed to import sample data';
@@ -932,6 +937,8 @@ const formatDate = (dateString: string) => {
   return format(new Date(dateString), 'MMM d, yyyy HH:mm');
 };
 
+// Import history functions - COMMENTED OUT
+/*
 const showErrors = (session: any) => {
   selectedSession.value = {
     ...session,
@@ -950,10 +957,11 @@ const viewImportedDocuments = (session: HealthImportSession) => {
   detailsSession.value = null;
   router.push(`/health?import=${session.id}`);
 };
+*/
 
 onMounted(async () => {
   await Promise.all([
-    healthStore.fetchImportSessions(),
+    // healthStore.fetchImportSessions(), // COMMENTED OUT - import history removed
     healthStore.fetchDocuments(),
   ]);
 });
