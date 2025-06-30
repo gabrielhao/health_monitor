@@ -122,7 +122,7 @@ const navigationItems = [
   { name: 'Chat', to: '/chat', icon: ChatBubbleLeftRightIcon },
   { name: 'Analytics', to: '/analytics', icon: ChartBarIcon },
   { name: 'Import Data', to: '/import', icon: CloudArrowUpIcon },
-  { name: 'RAG Documents', to: '/rag-import', icon: DocumentTextIcon },
+//  { name: 'Import Documents', to: '/rag-import', icon: DocumentTextIcon },
   { name: 'Profile', to: '/profile', icon: Cog6ToothIcon },
 ];
 
