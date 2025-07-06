@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { fileUploadAdapter } from '@/services/fileUploadAdapter'
-import type { UploadProgress } from './useFileUpload'
+import type { UploadProgress } from '@/services/externalFileUploadService'
 import type { AdapterOptions, UploadResult, BatchUploadResult } from '@/services/fileUploadAdapter'
 import { useAuthStore } from '@/stores/auth'
 
@@ -195,17 +195,6 @@ export function useExternalFileUpload() {
     }
   }
 
-  /**
-   * Delete an uploaded file
-   */
-  const deleteFile = async (fileId: string) => {
-    try {
-      await fileUploadAdapter.deleteFile(fileId)
-    } catch (err: any) {
-      console.error('[useExternalFileUpload] Failed to delete file:', err)
-      throw err
-    }
-  }
 
   /**
    * Get file metadata
@@ -264,21 +253,6 @@ export function useExternalFileUpload() {
     error.value = ''
   }
 
-  /**
-   * Switch upload provider
-   */
-  const switchProvider = (provider: 'azure' | 'external') => {
-    console.log('[useExternalFileUpload] Switching provider to:', provider)
-    fileUploadAdapter.setDefaultProvider(provider)
-  }
-
-  /**
-   * Get provider configuration
-   */
-  const getProviderConfig = () => {
-    return fileUploadAdapter.getProviderConfig()
-  }
-
   return {
     // State
     uploading,
@@ -294,11 +268,9 @@ export function useExternalFileUpload() {
     uploadBatch,
     getUploadStatus,
     cancelUpload,
-    deleteFile,
+    //deleteFile,
     getFileMetadata,
-    resetProgress,
-    switchProvider,
-    getProviderConfig
+    resetProgress
   }
 }
 

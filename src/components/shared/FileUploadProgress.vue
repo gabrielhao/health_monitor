@@ -97,7 +97,7 @@ import {
   ExclamationTriangleIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
-import type { UploadProgress } from '@/composables/useFileUpload'
+import type { UploadProgress } from '@/services/externalFileUploadService'
 
 interface Props {
   fileName: string

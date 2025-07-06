@@ -81,16 +81,6 @@ class ChatService {
       const vectorStoreId = process.env.AZURE_OPENAI_VECTOR_STORE_ID || "vs_hpVCuZvyz7mBRHLnS9IrXsvl";
       const azureOpenAIKey = (process.env.AZURE_OPENAI_CHAT_API_KEY || ""); 
 
-      console.log('endpoint', endpoint);
-      console.log('apiVersion', apiVersion);
-      console.log('modelName', modelName);
-      console.log('deployment', deployment);
-      console.log('vectorStoreId', vectorStoreId);
-             // Use DefaultAzureCredential for authentication
-       //const credential = new DefaultAzureCredential();
-       //const scope = "https://cognitiveservices.azure.com/.default";
-       //const azureADTokenProvider = getBearerTokenProvider(credential, scope);
-
        this.client = new AzureOpenAI({
          endpoint: endpoint,
          apiVersion: apiVersion,
@@ -109,9 +99,9 @@ class ChatService {
       // Create or retrieve the health assistant
       await this.setupHealthAssistant();
 
-      console.log(`Chat service configured with endpoint: ${endpoint}`);
-      console.log(`Using model: ${modelName}`);
-      console.log(`Assistant ID: ${this.assistantId}`);
+      //console.log(`Chat service configured with endpoint: ${endpoint}`);
+      //console.log(`Using model: ${modelName}`);
+      //console.log(`Assistant ID: ${this.assistantId}`);
       console.log('AI Assistant-based chat service initialization completed successfully');
 
     } catch (error) {
@@ -149,7 +139,7 @@ class ChatService {
       const assistantOptions = {
         model: this.config.deployment, // Use the deployment name from config
         name: "health_aivital_assistant",
-        input: "user_message",
+        //input: "user_message",
         instructions: `You are a knowledgeable and supportive health assistant. You have access to the user's personal health data and should provide insights, explanations, and guidance based on this information.
     
     IMPORTANT GUIDELINES:

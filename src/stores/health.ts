@@ -302,26 +302,6 @@ export const useHealthStore = defineStore('health', () => {
     }
   }
 
-  const deleteDocument = async (documentId: string) => {
-    if (!authStore.user) return
-    
-    try {
-      const userId = authStore.user.id || '34e40758-9f57-4bce-85c6-bfc4871e3b92.dada2b80-4552-4be6-a0ee-864f4f3c56f6'
-      
-      // Use RAGService to delete the document
-      await RAGService.deleteDocument(documentId, userId)
-      
-      // Remove from local state
-      const index = documents.value.findIndex(doc => doc.id === documentId)
-      if (index !== -1) {
-        documents.value.splice(index, 1)
-      }
-    } catch (error) {
-      console.error('Error deleting document:', error)
-      throw error
-    }
-  }
-
   const clearProgress = () => {
     uploadProgress.value = []
   }
@@ -360,7 +340,6 @@ export const useHealthStore = defineStore('health', () => {
     fetchImportSessions,
     fetchDocuments,
     importHealthData,
-    deleteDocument,
     clearProgress,
   }
 })

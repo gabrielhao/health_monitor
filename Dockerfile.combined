@@ -32,6 +32,47 @@ COPY public/ ./public/
 # Build frontend for production
 RUN npm run build
 
+# Frontend production stage
+FROM node:${NODE_VERSION}-${ALPINE_VERSION} AS frontend-production
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files and install only production dependencies
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built frontend from frontend-builder stage
+COPY --from=frontend-builder /app/dist ./dist
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 -G nodejs
+
+# Change ownership of the app directory to non-root user
+RUN chown -R appuser:nodejs /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose frontend port
+EXPOSE 5173
+
+# Environment variables
+ENV NODE_ENV=production
+ENV PORT=5173
+
+# Health check for frontend
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5173', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Start the frontend application with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
+
 # Backend build stage
 FROM node:${NODE_VERSION}-${ALPINE_VERSION} AS backend-builder
 
@@ -53,8 +94,8 @@ COPY backend-service/src/ ./src/
 # Build backend TypeScript
 RUN npm run build
 
-# Production stage
-FROM node:${NODE_VERSION}-${ALPINE_VERSION} AS production
+# Backend production stage
+FROM node:${NODE_VERSION}-${ALPINE_VERSION} AS backend-production
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -69,9 +110,6 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built backend from backend-builder stage
 COPY --from=backend-builder /app/dist ./dist
 
-# Copy built frontend from frontend-builder stage
-COPY --from=frontend-builder /app/dist ./public
-
 # Create necessary directories
 RUN mkdir -p logs
 
@@ -85,18 +123,14 @@ RUN chown -R appuser:nodejs /app
 # Switch to non-root user
 USER appuser
 
-# Expose port (configurable via build arg)
-ARG PORT=3001
-EXPOSE ${PORT}
-
-# Environment variables
+# Backend port (internal only, not exposed)
 ENV NODE_ENV=production
-ENV PORT=${PORT}
+ENV PORT=3001
 
-# Health check with configurable port
+# Health check for backend
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3001) + '/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Start the application with dumb-init
+# Start the backend application with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["npm", "start"] 

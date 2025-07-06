@@ -118,19 +118,8 @@ export const useRAGStore = defineStore('rag', () => {
             progressItem.status = 'processing'
             progressItem.progress = 50
 
-            // Trigger file processing asynchronously (fire-and-forget)
-            const { nodeFileUploadService } = await import('@/services/nodeFileUploadService')
-            
-            // Start RAG processing asynchronously without waiting for completion
-            nodeFileUploadService.processRAGDocument(uploadResult.documentId, authStore.user.id, {
-              batchSize: options.chunkSize || 512,
-              transformOptions: options
-            }).catch(error => {
-              console.error(`Async RAG processing failed for document ${uploadResult.documentId}:`, error)
-              // Optionally, you could update the document status in the database here
-              // or emit an event to notify the UI of processing failures
-              throw error
-            })
+            // File uploaded successfully - processing will be handled by the external API backend
+            console.log(`File ${file.name} uploaded successfully. Processing will be handled by backend.`)
 
             // Create document object for local state
             const document = {
@@ -200,29 +189,6 @@ export const useRAGStore = defineStore('rag', () => {
     }
   }
 
-  const deleteDocument = async (documentId: string) => {
-    if (!authStore.user) return
-    
-    try {
-      await RAGService.deleteDocument(documentId, authStore.user.id)
-      documents.value = documents.value.filter(doc => doc.id !== documentId)
-    } catch (error) {
-      console.error('Error deleting document:', error)
-      throw error
-    }
-  }
-
-  const searchDocuments = async (query: string) => {
-    if (!authStore.user) return []
-
-    try {
-      return await RAGService.searchSimilarChunks(query, authStore.user.id)
-    } catch (error) {
-      console.error('Error searching documents:', error)
-      throw error
-    }
-  }
-
   const clearProgress = () => {
     uploadProgress.value = []
   }
@@ -240,8 +206,6 @@ export const useRAGStore = defineStore('rag', () => {
     fetchDocuments,
     fetchImportSessions,
     processFiles,
-    deleteDocument,
-    searchDocuments,
     clearProgress
   }
 })

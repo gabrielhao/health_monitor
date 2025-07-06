@@ -1,0 +1,56 @@
+services:
+  # Frontend service
+  frontend:
+    image: aivital-bdaghdbefgg7eafv.azurecr.io/demo/frontend:latest
+    ports:
+      - "80:5173"
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:80', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - backend
+
+  # Backend service (internal only)
+  backend:
+    image: aivital-bdaghdbefgg7eafv.azurecr.io/demo/backend:latest
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # Azure Cosmos DB Configuration (backend expects individual endpoint and key)
+      - AZURE_COSMOS_ENDPOINT=${AZURE_COSMOS_ENDPOINT}
+      - AZURE_COSMOS_KEY=${AZURE_COSMOS_KEY}
+      - AZURE_COSMOS_DATABASE=${AZURE_COSMOS_DATABASE:-HealthMonitorDB}
+      # Azure Storage Configuration
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      # CORS and Rate Limiting (Azure App Services)
+      - ALLOWED_ORIGINS=http://frontend:80,https://*.azurewebsites.net,https://*.thegooddevelopers.com
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - AZURE_OPENAI_ENDPOINT=https://health-monitor-openai.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2023-05-15
+      - AZURE_OPENAI_KEY=${AZURE_OPENAI_KEY}
+      - AZURE_OPENAI_CHAT_ENDPOINT=https://health-monitor-openai.openai.azure.com/
+      - AZURE_OPENAI_CHAT_API_KEY=${AZURE_OPENAI_CHAT_API_KEY}
+      - AZURE_OPENAI_CHAT_MODEL=gpt-4.1
+      - AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1
+      - AZURE_OPENAI_VECTOR_STORE_ID=${AZURE_OPENAI_VECTOR_STORE_ID}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_KEY}
+      - AZURE_OPENAI_ASSISTANT_ID=${AZURE_OPENAI_ASSISTANT_ID}
+    volumes:
+      # Optional: Mount logs directory for persistence (Azure App Services compatible)
+      - ${WEBAPP_STORAGE_HOME}/logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

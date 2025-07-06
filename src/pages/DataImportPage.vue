@@ -308,7 +308,6 @@
       :get-status="getDocumentStatus"
       :get-file-icon="getDocumentIcon"
       @refresh="healthStore.fetchDocuments"
-      @delete="healthStore.deleteDocument"
       class="mb-8"
     />
 
@@ -575,7 +574,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useHealthStore } from '@/stores/health';
-import { useFileUpload } from '@/composables/useFileUpload';
+import { useExternalFileUpload } from '@/composables/useExternalFileUpload';
 import { format } from 'date-fns';
 import FileUploadDropZone from '@/components/shared/FileUploadDropZone.vue';
 import UploadProgressList from '@/components/shared/UploadProgressList.vue';
@@ -593,7 +592,7 @@ import {
 
 const healthStore = useHealthStore();
 // const router = useRouter(); // Removed unused router
-const fileUpload = useFileUpload();
+const fileUpload = useExternalFileUpload();
 // const { getFileIcon } = useFileValidation(); // Removed unused function
 
 const showSampleData = ref(false);
@@ -723,7 +722,7 @@ const handleUpload = async () => {
         console.log(`Processing progress: ${progress}%`);
         if (currentImport.value) {
           currentImport.value.processed_records = Math.round(
-            (progress / 100) * (currentImport.value.total_records || 1)
+            (Number(progress) / 100) * (currentImport.value.total_records || 1)
           );
         }
       },

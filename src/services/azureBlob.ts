@@ -1,6 +1,5 @@
 import { BlobServiceClient } from '@azure/storage-blob' // Removed unused BlockBlobClient
 import { createBlobServiceClient, azureConfig } from './azureConfig'
-import { Buffer } from 'buffer'
 
 // Removed unused UploadOptions interface - it's defined in other services
 
@@ -87,38 +86,38 @@ class AzureBlobService {
     }
   }
 
-  async downloadFile(filePath: string): Promise<Buffer> {
-    const blobService = this.ensureConnection()
-    const containerClient = blobService.getContainerClient(this.containerName)
-    const blockBlobClient = containerClient.getBlockBlobClient(filePath)
+  // async downloadFile(filePath: string): Promise<Buffer> {
+  //   const blobService = this.ensureConnection()
+  //   const containerClient = blobService.getContainerClient(this.containerName)
+  //   const blockBlobClient = containerClient.getBlockBlobClient(filePath)
 
-    const downloadResponse = await blockBlobClient.download()
+  //   const downloadResponse = await blockBlobClient.download()
     
-    if (!downloadResponse.readableStreamBody) {
-      throw new Error('Failed to download file')
-    }
+  //   if (!downloadResponse.readableStreamBody) {
+  //     throw new Error('Failed to download file')
+  //   }
 
-    // Convert stream to buffer
-    const chunks: any[] = []
-    for await (const chunk of downloadResponse.readableStreamBody) {
-      chunks.push(chunk)
-    }
+  //   // Convert stream to buffer
+  //   const chunks: any[] = []
+  //   for await (const chunk of downloadResponse.readableStreamBody) {
+  //     chunks.push(chunk)
+  //   }
     
-    return Buffer.concat(chunks.map(chunk => Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
-  }
+  //   return Buffer.concat(chunks.map(chunk => Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+  // }
 
-  async downloadFileAsText(filePath: string): Promise<string> {
-    const buffer = await this.downloadFile(filePath)
-    return buffer.toString('utf-8')
-  }
+  // async downloadFileAsText(filePath: string): Promise<string> {
+  //   const buffer = await this.downloadFile(filePath)
+  //   return buffer.toString('utf-8')
+  // }
 
-  async deleteFile(filePath: string): Promise<void> {
-    const blobService = this.ensureConnection()
-    const containerClient = blobService.getContainerClient(this.containerName)
-    const blockBlobClient = containerClient.getBlockBlobClient(filePath)
+  // async deleteFile(filePath: string): Promise<void> {
+  //   const blobService = this.ensureConnection()
+  //   const containerClient = blobService.getContainerClient(this.containerName)
+  //   const blockBlobClient = containerClient.getBlockBlobClient(filePath)
 
-    await blockBlobClient.deleteIfExists()
-  }
+  //   await blockBlobClient.deleteIfExists()
+  // }
 
   async listFiles(userId: string, prefix?: string): Promise<string[]> {
     const blobService = this.ensureConnection()

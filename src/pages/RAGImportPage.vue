@@ -286,13 +286,6 @@
             <span :class="`px-2 py-1 rounded-full text-xs ${getDocumentStatusColor(document.isProcessed ? 'completed' : 'processing')}`">
               {{ document.isProcessed ? 'completed' : 'processing' }}
             </span>
-            <button 
-              @click="deleteDocument(document.id)"
-              class="text-neutral-400 hover:text-red-600"
-              :disabled="ragStore.processing"
-            >
-              <TrashIcon class="w-4 h-4" />
-            </button>
           </div>
         </div>
       </div>
@@ -348,7 +341,6 @@ import {
   CheckCircleIcon,
   ClockIcon,
   // XCircleIcon, // Removed unused icon
-  TrashIcon,
 } from '@heroicons/vue/24/outline'
 import type { RAGProcessingOptions } from '@/types/rag'
 
@@ -429,16 +421,6 @@ const processFiles = async () => {
     }
   } catch (error) {
     console.error('Processing failed:', error)
-  }
-}
-
-const deleteDocument = async (documentId: string) => {
-  if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
-    try {
-      await ragStore.deleteDocument(documentId)
-    } catch (error) {
-      console.error('Delete failed:', error)
-    }
   }
 }
 
