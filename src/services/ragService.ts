@@ -1,7 +1,7 @@
 import { azureCosmos } from './azureCosmos'
-import { azureBlob } from './azureBlob'
-import { azureEmbedding } from './azureEmbedding'
-import type { RAGDocument, RAGChunk, RAGImportSession } from '@/types/rag' // Removed unused RAGProcessingOptions
+//import { azureEmbedding } from './azureEmbedding'
+import { externalFileUploadService } from './externalFileUploadService'
+import type { RAGDocument, RAGImportSession } from '@/types/rag' // Removed unused RAGProcessingOptions
 
 export class RAGService {
   private static readonly SUPPORTED_FORMATS = [
@@ -98,9 +98,7 @@ export class RAGService {
   }
 
   static async uploadFile(file: File, userId: string): Promise<string> {
-    const fileName = `${userId}/${Date.now()}_${file.name}`
-    
-    const result = await azureBlob.uploadFile(file, userId, fileName)
+    const result = await externalFileUploadService.uploadFile(file, userId)
     return result.path
   }
 
@@ -136,42 +134,6 @@ export class RAGService {
       error_log: session.error_log || [],
       _partitionKey: session.user_id
     }))
-  }
-
-  static async searchSimilarChunks(
-    query: string,
-    userId: string,
-    limit = 10
-  ): Promise<RAGChunk[]> {
-    // First, generate embedding for the query
-    const embedding = await azureEmbedding.generateQueryEmbedding(query)
-
-    // Search for similar chunks using vector similarity
-    const similarChunks = await azureCosmos.searchSimilarRagChunks(
-      embedding,
-      userId,
-      {
-        threshold: 0.8,
-        limit
-      }
-    )
-
-    // Convert RagChunk[] to RAGChunk[]
-    return (similarChunks || []).map(chunk => ({
-      ...chunk,
-      embedding: chunk.embedding || [],
-      created_at: chunk.created_at,
-      metadata: chunk.metadata || {},
-      _partitionKey: chunk.user_id
-    }))
-  }
-
-  static async deleteDocument(documentId: string, userId: string): Promise<void> {
-    // Delete chunks first
-    await azureCosmos.deleteRagChunksByDocument(documentId, userId)
-
-    // Delete document
-    await azureCosmos.deleteRagDocument(documentId, userId)
   }
 
   static getFileIcon(fileType: string): string {

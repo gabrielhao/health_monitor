@@ -203,13 +203,13 @@ export class EmbeddingService {
     const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || 'text-embedding-ada-002';
     const apiKey = process.env.AZURE_OPENAI_KEY;
 
-    const credential = new DefaultAzureCredential();
-    const scope = "https://cognitiveservices.azure.com/.default";
-    const azureADTokenProvider = getBearerTokenProvider(credential, scope);
+    // const credential = new DefaultAzureCredential();
+    // const scope = "https://cognitiveservices.azure.com/.default";
+    // const azureADTokenProvider = getBearerTokenProvider(credential, scope);
 
     this.openAIClient = new AzureOpenAI({
         endpoint,
-        azureADTokenProvider,
+        apiKey,
         apiVersion: '2023-05-15',
         deployment: deploymentName,
       });

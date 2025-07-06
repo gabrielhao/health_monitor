@@ -1,0 +1,104 @@
+# Frontend Dockerfile for Vue.js Application
+# Build arguments for flexibility
+ARG NODE_VERSION=22
+ARG ALPINE_VERSION=alpine
+
+# Build arguments for environment variables
+ARG VITE_AZURE_CLIENT_ID
+ARG VITE_AZURE_TENANT_ID
+ARG VITE_AZURE_EXTERNAL_ID_DOMAIN
+ARG VITE_AZURE_KNOWN_AUTHORITIES
+ARG VITE_AZURE_COSMOS_CONNECTION_STRING
+ARG VITE_AZURE_COSMOS_DATABASE
+ARG VITE_AZURE_STORAGE_ACCOUNT
+ARG VITE_AZURE_STORAGE_CONTAINER
+ARG VITE_AZURE_STORAGE_CONNECTION_STRING
+ARG VITE_BACKEND_SERVICE_URL
+ARG VITE_APP_NAME
+ARG VITE_APP_VERSION
+ARG VITE_ENVIRONMENT
+
+# Build stage
+FROM node:${NODE_VERSION}-${ALPINE_VERSION} AS builder
+
+# Set working directory for build
+WORKDIR /app
+
+# Set environment variables for build
+ENV VITE_AZURE_CLIENT_ID=${VITE_AZURE_CLIENT_ID}
+ENV VITE_AZURE_TENANT_ID=${VITE_AZURE_TENANT_ID}
+ENV VITE_AZURE_EXTERNAL_ID_DOMAIN=${VITE_AZURE_EXTERNAL_ID_DOMAIN}
+ENV VITE_AZURE_KNOWN_AUTHORITIES=${VITE_AZURE_KNOWN_AUTHORITIES}
+ENV VITE_AZURE_COSMOS_CONNECTION_STRING=${VITE_AZURE_COSMOS_CONNECTION_STRING}
+ENV VITE_AZURE_COSMOS_DATABASE=${VITE_AZURE_COSMOS_DATABASE}
+ENV VITE_AZURE_STORAGE_ACCOUNT=${VITE_AZURE_STORAGE_ACCOUNT}
+ENV VITE_AZURE_STORAGE_CONTAINER=${VITE_AZURE_STORAGE_CONTAINER}
+ENV VITE_AZURE_STORAGE_CONNECTION_STRING=${VITE_AZURE_STORAGE_CONNECTION_STRING}
+ENV VITE_BACKEND_SERVICE_URL=${VITE_BACKEND_SERVICE_URL}
+ENV VITE_APP_NAME=${VITE_APP_NAME}
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+ENV VITE_ENVIRONMENT=${VITE_ENVIRONMENT}
+
+# Copy package files first for better layer caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production=false
+
+# Copy all necessary config files for build
+COPY vite.config.ts ./
+COPY tsconfig*.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY eslint_new.config.js ./
+COPY vitest.config.ts ./
+COPY vitest.integration.config.ts ./
+COPY index.html ./
+
+# Copy source directories
+COPY src/ ./src/
+COPY public/ ./public/
+
+# Build frontend for production
+RUN npm run build
+
+# Production stage
+FROM node:${NODE_VERSION}-${ALPINE_VERSION} AS production
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files and install all dependencies (including vite for preview)
+COPY package*.json ./
+RUN npm ci && npm cache clean --force
+
+# Copy built frontend from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S appuser -u 1001 -G nodejs
+
+# Change ownership of the app directory to non-root user
+RUN chown -R appuser:nodejs /app
+
+# Switch to non-root user
+USER appuser
+
+# Expose frontend port
+EXPOSE 5173
+
+# Environment variables
+ENV NODE_ENV=production
+ENV PORT=5173
+
+# Health check for frontend
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5173', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Start the frontend application with dumb-init
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"] 

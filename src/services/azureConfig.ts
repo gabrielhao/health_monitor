@@ -1,39 +1,22 @@
 import { CosmosClient } from '@azure/cosmos';
-import { ClientSecretCredential } from '@azure/identity';
-import { SecretClient } from '@azure/keyvault-secrets';
 import { PublicClientApplication } from '@azure/msal-browser';
 import { BlobServiceClient } from '@azure/storage-blob';
-import { OpenAI } from 'openai';
 import type { UserProfile, HealthDocument, HealthEmbedding, ImportSession, DataSource } from '@/types/index';
 import type { RAGDocument, RAGChunk, RAGImportSession } from '@/types/rag';
 
 // Azure configuration
 const azureConfig = {
     auth: {
-        clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
+        clientId: 'eb04a8c7-27bf-49ee-ad20-9f860d6909d6',
         // For Entra External ID, use the correct authority format
-        authority:
-            import.meta.env.VITE_AZURE_AUTHORITY ||
-            (import.meta.env.VITE_AZURE_EXTERNAL_ID_DOMAIN
-                ? `https://${import.meta.env.VITE_AZURE_EXTERNAL_ID_DOMAIN}/${import.meta.env.VITE_AZURE_TENANT_ID}`
-                : `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}`),
+        authority: 'https://aivital.ciamlogin.com/dada2b80-4552-4be6-a0ee-864f4f3c56f6',
         redirectUri: window.location.origin,
         scopes: ['https://graph.microsoft.com/User.Read'],
         // Additional configuration for External ID
-        knownAuthorities: import.meta.env.VITE_AZURE_KNOWN_AUTHORITIES
-            ? import.meta.env.VITE_AZURE_KNOWN_AUTHORITIES.split(',')
-            : import.meta.env.VITE_AZURE_EXTERNAL_ID_DOMAIN
-              ? [import.meta.env.VITE_AZURE_EXTERNAL_ID_DOMAIN]
-              : undefined,
-    },
-    services: {
-        // Service principal credentials for accessing Azure services
-        clientId: import.meta.env.VITE_AZURE_SERVICE_CLIENT_ID,
-        tenantId: import.meta.env.VITE_AZURE_SERVICE_TENANT_ID,
-        clientSecret: import.meta.env.VITE_AZURE_SERVICE_CLIENT_SECRET,
+        knownAuthorities: ['aivital.ciamlogin.com'],
     },
     storage: {
-        accountName: import.meta.env.VITE_AZURE_STORAGE_ACCOUNT,
+        accountName: import.meta.env.VITE_AZURE_STORAGE_ACCOUNT || 'healthmonitorst',
         containerName: import.meta.env.VITE_AZURE_STORAGE_CONTAINER || 'health-files',
         connectionString: import.meta.env.VITE_AZURE_STORAGE_CONNECTION_STRING,
     },
@@ -56,34 +39,26 @@ const azureConfig = {
             analyticsData: 'analytics_data',
         },
     },
-    keyVault: {
-        vaultUrl: import.meta.env.VITE_AZURE_KEYVAULT_URL,
-    },
     openai: {
-        apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-        model: 'text-embedding-3-small',
+        //apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+        model: 'text-embedding-ada-002',
         dimensions: 1536,
     },
 };
 
 // Validate required environment variables
-const requiredEnvVars = [
-    'VITE_AZURE_CLIENT_ID',
-    'VITE_AZURE_TENANT_ID',
-    'VITE_AZURE_SERVICE_CLIENT_ID',
-    'VITE_AZURE_SERVICE_TENANT_ID',
-    'VITE_AZURE_SERVICE_CLIENT_SECRET',
-    'VITE_AZURE_STORAGE_CONNECTION_STRING',
-    'VITE_AZURE_COSMOS_ENDPOINT',
-    'VITE_AZURE_COSMOS_KEY',
-    'VITE_OPENAI_API_KEY',
-];
+// const requiredEnvVars = [
+//     'VITE_AZURE_CLIENT_ID',
+//     'VITE_AZURE_TENANT_ID',
+//     'VITE_AZURE_STORAGE_CONNECTION_STRING',
+//     'VITE_AZURE_COSMOS_CONNECTION_STRING',
+// ];
 
-for (const envVar of requiredEnvVars) {
-    if (!import.meta.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
-    }
-}
+// for (const envVar of requiredEnvVars) {
+//     if (!import.meta.env[envVar]) {
+//         throw new Error(`Missing required environment variable: ${envVar}`);
+//     }
+// }
 
 // Initialize MSAL instance for authentication
 export const msalInstance = new PublicClientApplication({
@@ -105,19 +80,11 @@ export const createCosmosClient = (): CosmosClient => {
     return new CosmosClient(azureConfig.cosmosDb.connectionString);
 };
 
-// Initialize Azure Key Vault client
-export const createKeyVaultClient = (): SecretClient => {
-    // WARNING: Using client secret in browser is not secure for production
-    // Consider using a backend service or Azure Functions for service-to-service auth
-    const credential = new ClientSecretCredential(azureConfig.services.tenantId!, azureConfig.services.clientId!, azureConfig.services.clientSecret!);
-    return new SecretClient(azureConfig.keyVault.vaultUrl, credential);
-};
-
-// Initialize OpenAI client
-export const openaiClient = new OpenAI({
-    apiKey: azureConfig.openai.apiKey,
-    dangerouslyAllowBrowser: true, // Only for development - use server-side in production
-});
+// // Initialize OpenAI client
+// export const openaiClient = new OpenAI({
+//     apiKey: azureConfig.openai.apiKey,
+//     dangerouslyAllowBrowser: true, // Only for development - use server-side in production
+// });
 
 export { azureConfig };
 

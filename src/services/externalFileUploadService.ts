@@ -1,4 +1,13 @@
-import type { UploadProgress } from '@/composables/useFileUpload'
+// UploadProgress interface moved here from useFileUpload composable
+export interface UploadProgress {
+  percentage: number
+  uploadedBytes: number
+  totalBytes: number
+  speed: number // bytes per second
+  eta: number // estimated time remaining in seconds
+  currentChunk: number
+  totalChunks: number
+}
 
 export interface UploadOptions {
   contentType?: string
@@ -62,7 +71,7 @@ class ExternalFileUploadService {
   private readonly maxRetries: number = 3
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_EXTERNAL_UPLOAD_API_URL || ''
+    this.baseUrl = import.meta.env.VITE_EXTERNAL_UPLOAD_API_URL || 'http://localhost:3001/api/upload'
     this.apiKey = import.meta.env.VITE_EXTERNAL_UPLOAD_API_KEY || ''
     
     if (!this.baseUrl) {
